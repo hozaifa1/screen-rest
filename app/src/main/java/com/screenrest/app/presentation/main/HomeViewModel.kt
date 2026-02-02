@@ -63,8 +63,10 @@ class HomeViewModel @Inject constructor(
     }
     
     private fun updateCountdown() {
-        val currentUsageMs = UsageTrackingService.currentUsageMs
-        val thresholdMs = UsageTrackingService.thresholdMs
+        val breakConfig = _uiState.value.breakConfig
+        val thresholdMs = breakConfig.usageThresholdMinutes * 60_000L
+        
+        val currentUsageMs = calculateRealtimeUsage(breakConfig)
         val remainingMs = (thresholdMs - currentUsageMs).coerceAtLeast(0L)
         
         val usedMinutes = (currentUsageMs / 60_000).toInt()
@@ -79,6 +81,20 @@ class HomeViewModel @Inject constructor(
             remainingTimeMinutes = remainingMinutes,
             remainingTimeSeconds = remainingSeconds
         )
+    }
+    
+    private fun calculateRealtimeUsage(breakConfig: com.screenrest.app.domain.model.BreakConfig): Long {
+        val lastBreakMs = UsageTrackingService.lastBreakTimestampMs
+        val currentTime = System.currentTimeMillis()
+        
+        return when (breakConfig.trackingMode) {
+            com.screenrest.app.domain.model.TrackingMode.CONTINUOUS -> {
+                currentTime - lastBreakMs
+            }
+            com.screenrest.app.domain.model.TrackingMode.CUMULATIVE_DAILY -> {
+                UsageTrackingService.currentUsageMs
+            }
+        }
     }
     
     fun refreshStatus() {

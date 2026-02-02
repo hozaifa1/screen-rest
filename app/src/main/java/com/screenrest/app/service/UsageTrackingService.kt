@@ -87,23 +87,22 @@ class UsageTrackingService : LifecycleService() {
                         
                         if (breakConfig.trackingMode == TrackingMode.CONTINUOUS) {
                             lastBreakTimestampMs = currentTime
-                            currentUsageMs = 0L
-                            Log.d(TAG, "CONTINUOUS mode: Screen ON, reset counter to 0")
+                            Log.d(TAG, "CONTINUOUS mode: Screen ON at $currentTime, tracking starts")
                         } else {
                             Log.d(TAG, "CUMULATIVE mode: Screen ON, starting new session")
                         }
                     }
                     Intent.ACTION_SCREEN_OFF -> {
-                        isScreenOn = false
-                        
                         if (breakConfig.trackingMode == TrackingMode.CONTINUOUS) {
-                            currentUsageMs = 0L
-                            Log.d(TAG, "CONTINUOUS mode: Screen OFF, counter reset to 0")
+                            lastBreakTimestampMs = System.currentTimeMillis()
+                            Log.d(TAG, "CONTINUOUS mode: Screen OFF, reset timestamp for next screen-on")
                         } else {
                             val sessionTime = System.currentTimeMillis() - lastScreenOnTimestamp
                             cumulativeUsageToday += sessionTime
                             Log.d(TAG, "CUMULATIVE mode: Screen OFF, added ${sessionTime}ms, total=${cumulativeUsageToday}ms")
                         }
+                        
+                        isScreenOn = false
                     }
                 }
             }
@@ -197,22 +196,41 @@ class UsageTrackingService : LifecycleService() {
         
         currentUsageMs = calculateCurrentUsage(breakConfig)
         val currentUsageMinutes = (currentUsageMs / 60_000).toInt()
+        val currentUsageSeconds = ((currentUsageMs % 60_000) / 1000).toInt()
         
         val thresholdReached = currentUsageMs >= thresholdMs
         
-        Log.d(TAG, "Tracking: usage=${currentUsageMs}ms (${currentUsageMinutes}m), threshold=${breakConfig.usageThresholdMinutes}m, screenOn=$isScreenOn")
+        Log.d(TAG, "==================== TRACKING CYCLE ====================")
+        Log.d(TAG, "Current Usage: ${currentUsageMs}ms (${currentUsageMinutes}m ${currentUsageSeconds}s)")
+        Log.d(TAG, "Threshold: ${thresholdMs}ms (${breakConfig.usageThresholdMinutes}m)")
+        Log.d(TAG, "Threshold Reached: $thresholdReached")
+        Log.d(TAG, "Screen On: $isScreenOn")
+        Log.d(TAG, "Block Active: ${BlockAccessibilityService.isBlockActive}")
+        Log.d(TAG, "Location Enabled: ${breakConfig.locationEnabled}")
+        Log.d(TAG, "Tracking Mode: ${breakConfig.trackingMode}")
+        Log.d(TAG, "=======================================================")
         
         if (thresholdReached && !BlockAccessibilityService.isBlockActive) {
+            Log.w(TAG, "⚠️ THRESHOLD REACHED! Attempting to trigger block...")
+            
             if (breakConfig.locationEnabled) {
-                if (isInTargetLocation(breakConfig)) {
+                val inLocation = isInTargetLocation(breakConfig)
+                Log.d(TAG, "Location check: $inLocation")
+                if (inLocation) {
+                    Log.w(TAG, "✅ TRIGGERING BLOCK (location OK)")
                     triggerBlock(breakConfig)
                 } else {
+                    Log.w(TAG, "❌ BLOCK SKIPPED (outside location)")
                     updateNotification("Outside target location - ${formatTime(currentUsageMs)}")
                 }
             } else {
+                Log.w(TAG, "✅ TRIGGERING BLOCK (no location check)")
                 triggerBlock(breakConfig)
             }
         } else {
+            if (thresholdReached) {
+                Log.d(TAG, "Threshold reached but block already active")
+            }
             val remainingMs = thresholdMs - currentUsageMs
             val remainingMinutes = (remainingMs / 60_000).toInt()
             val remainingSeconds = ((remainingMs % 60_000) / 1000).toInt()
@@ -271,14 +289,26 @@ class UsageTrackingService : LifecycleService() {
     }
     
     private fun triggerBlock(breakConfig: BreakConfig) {
-        Log.d(TAG, "Triggering block screen for ${breakConfig.blockDurationSeconds} seconds")
-        BlockAccessibilityService.isBlockActive = true
+        Log.w(TAG, "========== TRIGGERING BLOCK SCREEN ==========")
+        Log.w(TAG, "Block Duration: ${breakConfig.blockDurationSeconds} seconds")
         
-        val intent = Intent(this, BlockActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
+        try {
+            BlockAccessibilityService.isBlockActive = true
+            Log.d(TAG, "Set isBlockActive = true")
+            
+            val intent = Intent(this, BlockActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
+            }
+            
+            Log.w(TAG, "Starting BlockActivity with intent: $intent")
+            startActivity(intent)
+            Log.w(TAG, "✅ BlockActivity started successfully")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ FAILED TO START BLOCK ACTIVITY", e)
+            BlockAccessibilityService.isBlockActive = false
         }
-        startActivity(intent)
     }
     
     private fun formatTime(milliseconds: Long): String {
