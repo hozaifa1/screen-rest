@@ -77,15 +77,34 @@ class UsageTrackingService : LifecycleService() {
     
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                Intent.ACTION_SCREEN_ON -> {
-                    isScreenOn = true
-                    lastScreenOnTimestamp = System.currentTimeMillis()
-                    Log.d(TAG, "Screen turned ON")
-                }
-                Intent.ACTION_SCREEN_OFF -> {
-                    isScreenOn = false
-                    Log.d(TAG, "Screen turned OFF")
+            lifecycleScope.launch {
+                val breakConfig = settingsRepository.breakConfig.first()
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_ON -> {
+                        val currentTime = System.currentTimeMillis()
+                        isScreenOn = true
+                        lastScreenOnTimestamp = currentTime
+                        
+                        if (breakConfig.trackingMode == TrackingMode.CONTINUOUS) {
+                            lastBreakTimestampMs = currentTime
+                            currentUsageMs = 0L
+                            Log.d(TAG, "CONTINUOUS mode: Screen ON, reset counter to 0")
+                        } else {
+                            Log.d(TAG, "CUMULATIVE mode: Screen ON, starting new session")
+                        }
+                    }
+                    Intent.ACTION_SCREEN_OFF -> {
+                        isScreenOn = false
+                        
+                        if (breakConfig.trackingMode == TrackingMode.CONTINUOUS) {
+                            currentUsageMs = 0L
+                            Log.d(TAG, "CONTINUOUS mode: Screen OFF, counter reset to 0")
+                        } else {
+                            val sessionTime = System.currentTimeMillis() - lastScreenOnTimestamp
+                            cumulativeUsageToday += sessionTime
+                            Log.d(TAG, "CUMULATIVE mode: Screen OFF, added ${sessionTime}ms, total=${cumulativeUsageToday}ms")
+                        }
+                    }
                 }
             }
         }
@@ -204,7 +223,11 @@ class UsageTrackingService : LifecycleService() {
     private fun calculateCurrentUsage(breakConfig: BreakConfig): Long {
         return when (breakConfig.trackingMode) {
             TrackingMode.CONTINUOUS -> {
-                System.currentTimeMillis() - lastBreakTimestampMs
+                if (isScreenOn) {
+                    System.currentTimeMillis() - lastBreakTimestampMs
+                } else {
+                    0L
+                }
             }
             TrackingMode.CUMULATIVE_DAILY -> {
                 cumulativeUsageToday + (if (isScreenOn) System.currentTimeMillis() - lastScreenOnTimestamp else 0L)
