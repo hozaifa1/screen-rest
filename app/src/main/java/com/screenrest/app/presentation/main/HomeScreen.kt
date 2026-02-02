@@ -7,8 +7,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.screenrest.app.presentation.main.components.ConfigSummaryCard
 import com.screenrest.app.presentation.main.components.StatusCard
@@ -55,6 +59,16 @@ fun HomeScreen(
                 onToggleService = { viewModel.toggleService() }
             )
             
+            if (uiState.isServiceRunning) {
+                CountdownTimerCard(
+                    usedMinutes = uiState.usedTimeMinutes,
+                    usedSeconds = uiState.usedTimeSeconds,
+                    remainingMinutes = uiState.remainingTimeMinutes,
+                    remainingSeconds = uiState.remainingTimeSeconds,
+                    thresholdMinutes = uiState.breakConfig.usageThresholdMinutes
+                )
+            }
+            
             ConfigSummaryCard(
                 breakConfig = uiState.breakConfig,
                 onEditClick = onNavigateToSettings
@@ -82,6 +96,95 @@ fun HomeScreen(
                     description = "Break screen can be bypassed with home button. Enable for stricter enforcement.",
                     permissionType = "accessibility"
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CountdownTimerCard(
+    usedMinutes: Int,
+    usedSeconds: Int,
+    remainingMinutes: Int,
+    remainingSeconds: Int,
+    thresholdMinutes: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Time Until Next Break",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Text(
+                text = String.format("%d:%02d", remainingMinutes, remainingSeconds),
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "remaining",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = String.format("%d:%02d", usedMinutes, usedSeconds),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "used",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+                
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "${thresholdMinutes}m",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "threshold",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
             }
         }
     }

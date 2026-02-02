@@ -12,11 +12,13 @@ interface SettingsRepository {
     val themeMode: Flow<ThemeMode>
     val onboardingCompleted: Flow<Boolean>
     val usageTrackingEnabled: Flow<Boolean>
+    val lastBreakTimestamp: Flow<Long>
     
     suspend fun updateBreakConfig(config: BreakConfig)
     suspend fun updateThemeMode(theme: ThemeMode)
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setUsageTrackingEnabled(enabled: Boolean)
+    suspend fun updateLastBreakTimestamp(timestamp: Long)
 }
 
 @Singleton
@@ -28,6 +30,7 @@ class SettingsRepositoryImpl @Inject constructor(
     override val themeMode: Flow<ThemeMode> = settingsDataStore.themeMode
     override val onboardingCompleted: Flow<Boolean> = settingsDataStore.onboardingCompleted
     override val usageTrackingEnabled: Flow<Boolean> = settingsDataStore.usageTrackingEnabled
+    override val lastBreakTimestamp: Flow<Long> = settingsDataStore.lastBreakTimestamp
     
     override suspend fun updateBreakConfig(config: BreakConfig) {
         settingsDataStore.updateBreakConfig(config)
@@ -43,5 +46,9 @@ class SettingsRepositoryImpl @Inject constructor(
     
     override suspend fun setUsageTrackingEnabled(enabled: Boolean) {
         settingsDataStore.setUsageTrackingEnabled(enabled)
+    }
+    
+    override suspend fun updateLastBreakTimestamp(timestamp: Long) {
+        settingsDataStore.updateLastBreakTimestamp(timestamp)
     }
 }

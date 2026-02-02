@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,8 @@ fun SettingsScreen(
             HorizontalDivider()
             
             MessagesSection(
+                quranMessagesEnabled = uiState.breakConfig.quranMessagesEnabled,
+                onQuranMessagesToggle = { viewModel.updateQuranMessagesEnabled(it) },
                 onNavigateToCustomMessages = onNavigateToCustomMessages
             )
             
@@ -148,6 +151,8 @@ private fun BreakConfigurationSection(
 
 @Composable
 private fun MessagesSection(
+    quranMessagesEnabled: Boolean,
+    onQuranMessagesToggle: (Boolean) -> Unit,
     onNavigateToCustomMessages: () -> Unit
 ) {
     Column(
@@ -167,6 +172,38 @@ private fun MessagesSection(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Show Quranic Verses",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (quranMessagesEnabled) 
+                                "Quranic verses will be shown during breaks" 
+                            else 
+                                "Only custom messages will be shown",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = quranMessagesEnabled,
+                        onCheckedChange = onQuranMessagesToggle
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                HorizontalDivider()
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
                 Text(
                     text = "During breaks, you'll see:",
                     style = MaterialTheme.typography.bodyMedium
@@ -175,7 +212,10 @@ private fun MessagesSection(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "• Custom messages (if you add any)\n• Quranic verses from API (with fallback)\n• Built-in verses (always available)",
+                    text = if (quranMessagesEnabled)
+                        "• Custom messages (if you add any)\n• Quranic verses from API (with fallback)\n• Built-in verses (always available)"
+                    else
+                        "• Custom messages only\n• Add messages below to personalize your breaks",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

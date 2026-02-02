@@ -4,11 +4,14 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.location.Location
 import android.os.Build
+import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -18,7 +21,7 @@ import com.screenrest.app.R
 import com.screenrest.app.data.repository.SettingsRepository
 import com.screenrest.app.domain.model.BreakConfig
 import com.screenrest.app.domain.model.TrackingMode
-import com.screenrest.app.receiver.BlockCompleteReceiver
+import com.screenrest.app.presentation.block.BlockActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,25 +34,87 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class UsageTrackingService : LifecycleService() {
     
+    companion object {
+        private const val TAG = "UsageTrackingService"
+        private const val NOTIFICATION_ID = 1001
+        private const val CHANNEL_ID = "screenrest_tracking"
+        private const val POLLING_INTERVAL_MS = 5_000L
+        
+        @Volatile
+        var lastBreakTimestampMs: Long = System.currentTimeMillis()
+            private set
+        
+        @Volatile
+        var currentUsageMs: Long = 0L
+            private set
+        
+        @Volatile
+        var thresholdMs: Long = 0L
+            private set
+        
+        fun resetTrackingTimestamp() {
+            lastBreakTimestampMs = System.currentTimeMillis()
+            currentUsageMs = 0L
+        }
+    }
+    
     @Inject lateinit var settingsRepository: SettingsRepository
-    @Inject lateinit var usageCalculator: UsageCalculator
     @Inject lateinit var permissionChecker: PermissionChecker
     
     private var trackingJob: Job? = null
-    private var trackingStartTimestamp: Long = 0L
     private var lastDayCheck: Int = -1
     private var cumulativeUsageToday: Long = 0L
+    private var lastScreenOnTimestamp: Long = 0L
+    private var isScreenOn: Boolean = true
     
-    private val blockCompleteReceiver = BlockCompleteReceiver()
+    private val powerManager by lazy {
+        getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
     
     private val fusedLocationClient by lazy {
         LocationServices.getFusedLocationProviderClient(this)
     }
     
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    isScreenOn = true
+                    lastScreenOnTimestamp = System.currentTimeMillis()
+                    Log.d(TAG, "Screen turned ON")
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    isScreenOn = false
+                    Log.d(TAG, "Screen turned OFF")
+                }
+            }
+        }
+    }
+    
+    private val blockCompleteReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.screenrest.app.ACTION_BLOCK_COMPLETE") {
+                Log.d(TAG, "Block complete received, resetting tracking")
+                BlockAccessibilityService.isBlockActive = false
+                resetTrackingTimestamp()
+                lifecycleScope.launch {
+                    settingsRepository.updateLastBreakTimestamp(System.currentTimeMillis())
+                }
+            }
+        }
+    }
+    
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        registerBlockCompleteReceiver()
+        registerReceivers()
+        
+        isScreenOn = powerManager.isInteractive
+        lastScreenOnTimestamp = System.currentTimeMillis()
+        
+        lifecycleScope.launch {
+            lastBreakTimestampMs = settingsRepository.lastBreakTimestamp.first()
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -66,28 +131,39 @@ class UsageTrackingService : LifecycleService() {
     override fun onDestroy() {
         super.onDestroy()
         trackingJob?.cancel()
-        unregisterReceiver(blockCompleteReceiver)
+        try {
+            unregisterReceiver(screenReceiver)
+            unregisterReceiver(blockCompleteReceiver)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering receivers", e)
+        }
     }
     
-    private fun registerBlockCompleteReceiver() {
-        val filter = IntentFilter("com.screenrest.app.ACTION_BLOCK_COMPLETE")
+    private fun registerReceivers() {
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        registerReceiver(screenReceiver, screenFilter)
+        
+        val blockFilter = IntentFilter("com.screenrest.app.ACTION_BLOCK_COMPLETE")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(blockCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(blockCompleteReceiver, blockFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            registerReceiver(blockCompleteReceiver, filter)
+            registerReceiver(blockCompleteReceiver, blockFilter)
         }
     }
     
     private fun startTracking() {
-        trackingStartTimestamp = System.currentTimeMillis()
         lastDayCheck = getCurrentDay()
         
+        trackingJob?.cancel()
         trackingJob = lifecycleScope.launch {
             while (isActive) {
                 try {
                     performTrackingCycle()
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Log.e(TAG, "Error in tracking cycle", e)
                 }
                 delay(POLLING_INTERVAL_MS)
             }
@@ -95,20 +171,19 @@ class UsageTrackingService : LifecycleService() {
     }
     
     private suspend fun performTrackingCycle() {
-        if (!permissionChecker.checkUsageStatsPermission()) {
-            updateNotification("Missing usage stats permission")
-            return
-        }
-        
         val breakConfig = settingsRepository.breakConfig.first()
-        val currentUsageMs = calculateCurrentUsage(breakConfig)
-        val currentUsageMinutes = (currentUsageMs / 60_000).toInt()
+        thresholdMs = breakConfig.usageThresholdMinutes * 60_000L
         
         checkDailyReset(breakConfig)
         
-        val thresholdReached = currentUsageMinutes >= breakConfig.usageThresholdMinutes
+        currentUsageMs = calculateCurrentUsage(breakConfig)
+        val currentUsageMinutes = (currentUsageMs / 60_000).toInt()
         
-        if (thresholdReached) {
+        val thresholdReached = currentUsageMs >= thresholdMs
+        
+        Log.d(TAG, "Tracking: usage=${currentUsageMs}ms (${currentUsageMinutes}m), threshold=${breakConfig.usageThresholdMinutes}m, screenOn=$isScreenOn")
+        
+        if (thresholdReached && !BlockAccessibilityService.isBlockActive) {
             if (breakConfig.locationEnabled) {
                 if (isInTargetLocation(breakConfig)) {
                     triggerBlock(breakConfig)
@@ -119,18 +194,20 @@ class UsageTrackingService : LifecycleService() {
                 triggerBlock(breakConfig)
             }
         } else {
-            val remaining = breakConfig.usageThresholdMinutes - currentUsageMinutes
-            updateNotification("Time used: ${formatTime(currentUsageMs)} | ${remaining}m until break")
+            val remainingMs = thresholdMs - currentUsageMs
+            val remainingMinutes = (remainingMs / 60_000).toInt()
+            val remainingSeconds = ((remainingMs % 60_000) / 1000).toInt()
+            updateNotification("Used: ${formatTime(currentUsageMs)} | Break in ${remainingMinutes}m ${remainingSeconds}s")
         }
     }
     
-    private suspend fun calculateCurrentUsage(breakConfig: BreakConfig): Long {
+    private fun calculateCurrentUsage(breakConfig: BreakConfig): Long {
         return when (breakConfig.trackingMode) {
             TrackingMode.CONTINUOUS -> {
-                usageCalculator.getContinuousUsageSinceTimestamp(trackingStartTimestamp)
+                System.currentTimeMillis() - lastBreakTimestampMs
             }
             TrackingMode.CUMULATIVE_DAILY -> {
-                cumulativeUsageToday
+                cumulativeUsageToday + (if (isScreenOn) System.currentTimeMillis() - lastScreenOnTimestamp else 0L)
             }
         }
     }
@@ -162,35 +239,29 @@ class UsageTrackingService : LifecycleService() {
                 val distance = location.distanceTo(targetLocation)
                 distance <= breakConfig.locationRadiusMeters
             } else {
-                false
+                true
             }
         } catch (e: Exception) {
-            false
+            Log.e(TAG, "Error getting location", e)
+            true
         }
     }
     
     private fun triggerBlock(breakConfig: BreakConfig) {
+        Log.d(TAG, "Triggering block screen for ${breakConfig.blockDurationSeconds} seconds")
         BlockAccessibilityService.isBlockActive = true
         
-        val intent = Intent(this, Class.forName("com.screenrest.app.presentation.block.BlockActivity")).apply {
+        val intent = Intent(this, BlockActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
         }
         startActivity(intent)
-        
-        when (breakConfig.trackingMode) {
-            TrackingMode.CONTINUOUS -> {
-                trackingStartTimestamp = System.currentTimeMillis()
-            }
-            TrackingMode.CUMULATIVE_DAILY -> {
-                cumulativeUsageToday = 0L
-            }
-        }
     }
     
     private fun formatTime(milliseconds: Long): String {
-        val minutes = (milliseconds / 60_000).toInt()
-        val seconds = ((milliseconds % 60_000) / 1000).toInt()
+        val totalSeconds = milliseconds / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
         return String.format("%d:%02d", minutes, seconds)
     }
     
@@ -232,11 +303,5 @@ class UsageTrackingService : LifecycleService() {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
-    }
-    
-    companion object {
-        private const val NOTIFICATION_ID = 1001
-        private const val CHANNEL_ID = "screenrest_tracking"
-        private const val POLLING_INTERVAL_MS = 30_000L
     }
 }

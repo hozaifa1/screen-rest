@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.screenrest.app.domain.model.BreakConfig
@@ -35,6 +36,8 @@ class SettingsDataStore @Inject constructor(
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val USAGE_TRACKING_ENABLED = booleanPreferencesKey("usage_tracking_enabled")
+        val QURAN_MESSAGES_ENABLED = booleanPreferencesKey("quran_messages_enabled")
+        val LAST_BREAK_TIMESTAMP = longPreferencesKey("last_break_timestamp")
     }
 
     val breakConfig: Flow<BreakConfig> = context.dataStore.data.map { preferences ->
@@ -47,8 +50,13 @@ class SettingsDataStore @Inject constructor(
             locationEnabled = preferences[PreferencesKeys.LOCATION_ENABLED] ?: false,
             locationLat = preferences[PreferencesKeys.LOCATION_LAT],
             locationLng = preferences[PreferencesKeys.LOCATION_LNG],
-            locationRadiusMeters = preferences[PreferencesKeys.LOCATION_RADIUS_METERS] ?: 100f
+            locationRadiusMeters = preferences[PreferencesKeys.LOCATION_RADIUS_METERS] ?: 100f,
+            quranMessagesEnabled = preferences[PreferencesKeys.QURAN_MESSAGES_ENABLED] ?: true
         )
+    }
+
+    val lastBreakTimestamp: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.LAST_BREAK_TIMESTAMP] ?: System.currentTimeMillis()
     }
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
@@ -72,6 +80,13 @@ class SettingsDataStore @Inject constructor(
             config.locationLat?.let { preferences[PreferencesKeys.LOCATION_LAT] = it }
             config.locationLng?.let { preferences[PreferencesKeys.LOCATION_LNG] = it }
             preferences[PreferencesKeys.LOCATION_RADIUS_METERS] = config.locationRadiusMeters
+            preferences[PreferencesKeys.QURAN_MESSAGES_ENABLED] = config.quranMessagesEnabled
+        }
+    }
+
+    suspend fun updateLastBreakTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_BREAK_TIMESTAMP] = timestamp
         }
     }
 

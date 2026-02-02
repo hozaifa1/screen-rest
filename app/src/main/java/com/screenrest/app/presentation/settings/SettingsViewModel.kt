@@ -76,6 +76,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
     
+    fun updateQuranMessagesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val config = _uiState.value.breakConfig.copy(quranMessagesEnabled = enabled)
+            updateBreakConfigUseCase(config)
+        }
+    }
+    
     fun dismissLongDurationWarning() {
         _uiState.value = _uiState.value.copy(showLongDurationWarning = false)
     }
