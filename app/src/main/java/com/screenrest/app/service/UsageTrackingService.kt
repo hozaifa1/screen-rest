@@ -128,11 +128,11 @@ class UsageTrackingService : LifecycleService() {
         registerReceivers()
         
         isScreenOn = powerManager.isInteractive
-        lastScreenOnTimestamp = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        lastScreenOnTimestamp = now
+        lastBreakTimestampMs = now
         
-        lifecycleScope.launch {
-            lastBreakTimestampMs = settingsRepository.lastBreakTimestamp.first()
-        }
+        Log.d(TAG, "Service onCreate: isScreenOn=$isScreenOn, lastBreakTimestampMs=$lastBreakTimestampMs")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -141,7 +141,18 @@ class UsageTrackingService : LifecycleService() {
         val notification = createNotification("Monitoring screen time...")
         startForeground(NOTIFICATION_ID, notification)
         
-        startTracking()
+        lifecycleScope.launch {
+            try {
+                val storedTimestamp = settingsRepository.lastBreakTimestamp.first()
+                if (storedTimestamp > 0) {
+                    lastBreakTimestampMs = storedTimestamp
+                }
+                Log.d(TAG, "Loaded lastBreakTimestamp from datastore: $lastBreakTimestampMs")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading lastBreakTimestamp", e)
+            }
+            startTracking()
+        }
         
         return START_STICKY
     }
@@ -297,17 +308,27 @@ class UsageTrackingService : LifecycleService() {
             Log.d(TAG, "Set isBlockActive = true")
             
             val intent = Intent(this, BlockActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_NO_HISTORY
                 putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
             }
             
-            Log.w(TAG, "Starting BlockActivity with intent: $intent")
+            Log.w(TAG, "Starting BlockActivity...")
             startActivity(intent)
             Log.w(TAG, "✅ BlockActivity started successfully")
             
+            resetTrackingTimestamp()
+            lifecycleScope.launch {
+                settingsRepository.updateLastBreakTimestamp(System.currentTimeMillis())
+            }
+            
         } catch (e: Exception) {
-            Log.e(TAG, "❌ FAILED TO START BLOCK ACTIVITY", e)
+            Log.e(TAG, "❌ FAILED TO START BLOCK ACTIVITY: ${e.message}", e)
             BlockAccessibilityService.isBlockActive = false
+            
+            resetTrackingTimestamp()
         }
     }
     
