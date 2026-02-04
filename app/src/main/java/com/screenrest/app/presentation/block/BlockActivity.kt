@@ -3,27 +3,36 @@ package com.screenrest.app.presentation.block
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.util.Log
 import android.view.View
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.screenrest.app.service.BlockAccessibilityService
 import com.screenrest.app.presentation.theme.ScreenRestTheme
-import dagger.hilt.android.AndroidEntryPoint
 
-@AndroidEntryPoint
 class BlockActivity : ComponentActivity() {
     
     companion object {
         private const val TAG = "BlockActivity"
     }
     
-    private val viewModel: BlockViewModel by viewModels()
+    private var countDownTimer: CountDownTimer? = null
+    private var remainingSecondsState = mutableIntStateOf(30)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,19 +43,15 @@ class BlockActivity : ComponentActivity() {
             setupImmersiveMode()
             
             val duration = intent.getIntExtra("BLOCK_DURATION_SECONDS", 30)
+            remainingSecondsState.intValue = duration
             Log.d(TAG, "Block duration: $duration seconds")
             
-            viewModel.startCountdown(duration) {
-                finishBlock()
-            }
+            startCountdown(duration)
             
             setContent {
                 ScreenRestTheme {
-                    val state by viewModel.state.collectAsState()
-                    BlockScreen(
-                        remainingSeconds = state.remainingSeconds,
-                        displayMessage = state.displayMessage,
-                        isLoading = state.isLoading
+                    SimpleBlockScreen(
+                        remainingSeconds = remainingSecondsState.intValue
                     )
                 }
             }
@@ -55,6 +60,25 @@ class BlockActivity : ComponentActivity() {
             Log.e(TAG, "Error in BlockActivity onCreate", e)
             finishBlock()
         }
+    }
+    
+    private fun startCountdown(durationSeconds: Int) {
+        countDownTimer?.cancel()
+        countDownTimer = object : CountDownTimer(durationSeconds * 1000L, 1000L) {
+            override fun onTick(millisUntilFinished: Long) {
+                remainingSecondsState.intValue = (millisUntilFinished / 1000).toInt()
+            }
+            
+            override fun onFinish() {
+                remainingSecondsState.intValue = 0
+                finishBlock()
+            }
+        }.start()
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        countDownTimer?.cancel()
     }
     
     private fun setupWindowFlags() {
@@ -114,6 +138,49 @@ class BlockActivity : ComponentActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
             setupImmersiveMode()
+        }
+    }
+}
+
+@Composable
+private fun SimpleBlockScreen(remainingSeconds: Int) {
+    val minutes = remainingSeconds / 60
+    val seconds = remainingSeconds % 60
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A2E)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Text(
+                text = String.format("%d:%02d", minutes, seconds),
+                fontSize = 72.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Text(
+                text = "Take a break",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.9f)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "Rest your eyes and relax",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

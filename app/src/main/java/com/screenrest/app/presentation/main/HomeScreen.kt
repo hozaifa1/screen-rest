@@ -14,9 +14,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.screenrest.app.domain.model.TrackingMode
 import com.screenrest.app.presentation.main.components.ConfigSummaryCard
 import com.screenrest.app.presentation.main.components.StatusCard
 import com.screenrest.app.presentation.components.PermissionWarningCard
+import com.screenrest.app.service.UsageTrackingService
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,9 +29,30 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
+    // Local timer state that updates every second
+    var currentTimeMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    
+    // Update currentTimeMs every second while this composable is active
     LaunchedEffect(Unit) {
         viewModel.refreshStatus()
+        while (true) {
+            currentTimeMs = System.currentTimeMillis()
+            delay(1000L)
+        }
     }
+    
+    // Calculate timer values based on current time
+    val thresholdMs = uiState.breakConfig.usageThresholdSeconds * 1000L
+    val usageMs = when (uiState.breakConfig.trackingMode) {
+        TrackingMode.CONTINUOUS -> currentTimeMs - UsageTrackingService.lastBreakTimestampMs
+        TrackingMode.CUMULATIVE_DAILY -> UsageTrackingService.currentUsageMs
+    }
+    val remainingMs = (thresholdMs - usageMs).coerceAtLeast(0L)
+    
+    val usedMinutes = (usageMs / 60000).toInt()
+    val usedSeconds = ((usageMs % 60000) / 1000).toInt()
+    val remainingMinutes = (remainingMs / 60000).toInt()
+    val remainingSeconds = ((remainingMs % 60000) / 1000).toInt()
     
     Scaffold(
         topBar = {
@@ -59,15 +83,14 @@ fun HomeScreen(
                 onToggleService = { viewModel.toggleService() }
             )
             
-            if (uiState.isServiceRunning) {
-                CountdownTimerCard(
-                    usedMinutes = uiState.usedTimeMinutes,
-                    usedSeconds = uiState.usedTimeSeconds,
-                    remainingMinutes = uiState.remainingTimeMinutes,
-                    remainingSeconds = uiState.remainingTimeSeconds,
-                    thresholdSeconds = uiState.breakConfig.usageThresholdSeconds
-                )
-            }
+            CountdownTimerCard(
+                usedMinutes = usedMinutes,
+                usedSeconds = usedSeconds,
+                remainingMinutes = remainingMinutes,
+                remainingSeconds = remainingSeconds,
+                thresholdSeconds = uiState.breakConfig.usageThresholdSeconds,
+                isTracking = uiState.isServiceRunning
+            )
             
             ConfigSummaryCard(
                 breakConfig = uiState.breakConfig,
@@ -107,12 +130,16 @@ private fun CountdownTimerCard(
     usedSeconds: Int,
     remainingMinutes: Int,
     remainingSeconds: Int,
-    thresholdSeconds: Int
+    thresholdSeconds: Int,
+    isTracking: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = if (isTracking) 
+                MaterialTheme.colorScheme.primaryContainer 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
@@ -122,10 +149,13 @@ private fun CountdownTimerCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Time Until Next Break",
+                text = if (isTracking) "Time Until Next Break" else "Tracking Paused",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = if (isTracking) 
+                    MaterialTheme.colorScheme.onPrimaryContainer 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Spacer(modifier = Modifier.height(12.dp))

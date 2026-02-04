@@ -38,7 +38,7 @@ class UsageTrackingService : LifecycleService() {
         private const val TAG = "UsageTrackingService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "screenrest_tracking"
-        private const val POLLING_INTERVAL_MS = 5_000L
+        private const val POLLING_INTERVAL_MS = 1_000L
         
         @Volatile
         var lastBreakTimestampMs: Long = System.currentTimeMillis()
@@ -62,10 +62,14 @@ class UsageTrackingService : LifecycleService() {
     @Inject lateinit var permissionChecker: PermissionChecker
     
     private var trackingJob: Job? = null
+    private var configJob: Job? = null
     private var lastDayCheck: Int = -1
     private var cumulativeUsageToday: Long = 0L
     private var lastScreenOnTimestamp: Long = 0L
     private var isScreenOn: Boolean = true
+    
+    // Cached config to avoid suspending in the loop
+    private var cachedBreakConfig: BreakConfig = BreakConfig()
     
     private val powerManager by lazy {
         getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -77,33 +81,31 @@ class UsageTrackingService : LifecycleService() {
     
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            lifecycleScope.launch {
-                val breakConfig = settingsRepository.breakConfig.first()
-                when (intent?.action) {
-                    Intent.ACTION_SCREEN_ON -> {
-                        val currentTime = System.currentTimeMillis()
-                        isScreenOn = true
-                        lastScreenOnTimestamp = currentTime
-                        
-                        if (breakConfig.trackingMode == TrackingMode.CONTINUOUS) {
-                            lastBreakTimestampMs = currentTime
-                            Log.d(TAG, "CONTINUOUS mode: Screen ON at $currentTime, tracking starts")
-                        } else {
-                            Log.d(TAG, "CUMULATIVE mode: Screen ON, starting new session")
-                        }
+            // Update immediately without waiting for coroutine
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    val currentTime = System.currentTimeMillis()
+                    isScreenOn = true
+                    lastScreenOnTimestamp = currentTime
+                    
+                    if (cachedBreakConfig.trackingMode == TrackingMode.CONTINUOUS) {
+                        lastBreakTimestampMs = currentTime
+                        Log.d(TAG, "CONTINUOUS mode: Screen ON at $currentTime, tracking starts")
+                    } else {
+                        Log.d(TAG, "CUMULATIVE mode: Screen ON, starting new session")
                     }
-                    Intent.ACTION_SCREEN_OFF -> {
-                        if (breakConfig.trackingMode == TrackingMode.CONTINUOUS) {
-                            lastBreakTimestampMs = System.currentTimeMillis()
-                            Log.d(TAG, "CONTINUOUS mode: Screen OFF, reset timestamp for next screen-on")
-                        } else {
-                            val sessionTime = System.currentTimeMillis() - lastScreenOnTimestamp
-                            cumulativeUsageToday += sessionTime
-                            Log.d(TAG, "CUMULATIVE mode: Screen OFF, added ${sessionTime}ms, total=${cumulativeUsageToday}ms")
-                        }
-                        
-                        isScreenOn = false
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    if (cachedBreakConfig.trackingMode == TrackingMode.CONTINUOUS) {
+                        lastBreakTimestampMs = System.currentTimeMillis()
+                        Log.d(TAG, "CONTINUOUS mode: Screen OFF, reset timestamp for next screen-on")
+                    } else {
+                        val sessionTime = System.currentTimeMillis() - lastScreenOnTimestamp
+                        cumulativeUsageToday += sessionTime
+                        Log.d(TAG, "CUMULATIVE mode: Screen OFF, added ${sessionTime}ms, total=${cumulativeUsageToday}ms")
                     }
+                    
+                    isScreenOn = false
                 }
             }
         }
@@ -141,6 +143,16 @@ class UsageTrackingService : LifecycleService() {
         val notification = createNotification("Monitoring screen time...")
         startForeground(NOTIFICATION_ID, notification)
         
+        // Start config collector
+        configJob?.cancel()
+        configJob = lifecycleScope.launch {
+            settingsRepository.breakConfig.collect { config ->
+                cachedBreakConfig = config
+                thresholdMs = config.usageThresholdSeconds * 1_000L
+                Log.d(TAG, "Config updated: threshold=${config.usageThresholdSeconds}s, mode=${config.trackingMode}")
+            }
+        }
+        
         lifecycleScope.launch {
             try {
                 val storedTimestamp = settingsRepository.lastBreakTimestamp.first()
@@ -160,6 +172,7 @@ class UsageTrackingService : LifecycleService() {
     override fun onDestroy() {
         super.onDestroy()
         trackingJob?.cancel()
+        configJob?.cancel()
         try {
             unregisterReceiver(screenReceiver)
             unregisterReceiver(blockCompleteReceiver)
@@ -200,8 +213,8 @@ class UsageTrackingService : LifecycleService() {
     }
     
     private suspend fun performTrackingCycle() {
-        val breakConfig = settingsRepository.breakConfig.first()
-        thresholdMs = breakConfig.usageThresholdSeconds * 1_000L
+        // Use cached config directly
+        val breakConfig = cachedBreakConfig
         
         checkDailyReset(breakConfig)
         
@@ -211,16 +224,6 @@ class UsageTrackingService : LifecycleService() {
         
         val thresholdReached = currentUsageMs >= thresholdMs
         
-        Log.d(TAG, "==================== TRACKING CYCLE ====================")
-        Log.d(TAG, "Current Usage: ${currentUsageMs}ms (${currentUsageMinutes}m ${currentUsageSeconds}s)")
-        Log.d(TAG, "Threshold: ${thresholdMs}ms (${breakConfig.usageThresholdSeconds}s)")
-        Log.d(TAG, "Threshold Reached: $thresholdReached")
-        Log.d(TAG, "Screen On: $isScreenOn")
-        Log.d(TAG, "Block Active: ${BlockAccessibilityService.isBlockActive}")
-        Log.d(TAG, "Location Enabled: ${breakConfig.locationEnabled}")
-        Log.d(TAG, "Tracking Mode: ${breakConfig.trackingMode}")
-        Log.d(TAG, "=======================================================")
-        
         if (thresholdReached && !BlockAccessibilityService.isBlockActive) {
             Log.w(TAG, "⚠️ THRESHOLD REACHED! Attempting to trigger block...")
             
@@ -228,15 +231,13 @@ class UsageTrackingService : LifecycleService() {
                 val inLocation = isInTargetLocation(breakConfig)
                 Log.d(TAG, "Location check: $inLocation")
                 if (inLocation) {
-                    Log.w(TAG, "✅ TRIGGERING BLOCK (location OK)")
-                    triggerBlock(breakConfig)
+                    attemptBlockLaunch(breakConfig)
                 } else {
                     Log.w(TAG, "❌ BLOCK SKIPPED (outside location)")
                     updateNotification("Outside target location - ${formatTime(currentUsageMs)}")
                 }
             } else {
-                Log.w(TAG, "✅ TRIGGERING BLOCK (no location check)")
-                triggerBlock(breakConfig)
+                attemptBlockLaunch(breakConfig)
             }
         } else {
             if (thresholdReached) {
@@ -247,6 +248,50 @@ class UsageTrackingService : LifecycleService() {
             val remainingSeconds = ((remainingMs % 60_000) / 1000).toInt()
             updateNotification("Used: ${formatTime(currentUsageMs)} | Break in ${remainingMinutes}m ${remainingSeconds}s")
         }
+    }
+    
+    private fun attemptBlockLaunch(breakConfig: BreakConfig) {
+        if (android.provider.Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "✅ TRIGGERING BLOCK (Overlay permission granted)")
+            triggerBlock(breakConfig)
+        } else {
+            Log.w(TAG, "⚠️ Overlay permission MISSING. Showing notification instead.")
+            showBlockNotification(breakConfig)
+        }
+    }
+
+    private fun showBlockNotification(breakConfig: BreakConfig) {
+        // Fallback for when we can't launch activity directly
+        val intent = Intent(this, BlockActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_NO_HISTORY
+            putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
+        }
+        
+        val pendingIntent = PendingIntent.getActivity(
+            this, 
+            1, 
+            intent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("TIME FOR A BREAK!")
+            .setContentText("Tap immediately to start your break.")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(pendingIntent, true) // This might popup if permitted
+            .setAutoCancel(true)
+            .build()
+            
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID + 1, notification)
+        
+        // We still mark block as active to prevent spam
+        BlockAccessibilityService.isBlockActive = true
     }
     
     private fun calculateCurrentUsage(breakConfig: BreakConfig): Long {
