@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -33,6 +34,7 @@ class BlockActivity : ComponentActivity() {
     
     private var countDownTimer: CountDownTimer? = null
     private var remainingSecondsState = mutableIntStateOf(30)
+    private var isBlockComplete = false
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +64,24 @@ class BlockActivity : ComponentActivity() {
         }
     }
     
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        Log.d(TAG, "onNewIntent called - activity reused")
+        setIntent(intent)
+        
+        if (!isBlockComplete) {
+            val duration = intent?.getIntExtra("BLOCK_DURATION_SECONDS", 30) ?: 30
+            remainingSecondsState.intValue = duration
+            startCountdown(duration)
+        }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "onResume called")
+        setupImmersiveMode()
+    }
+    
     private fun startCountdown(durationSeconds: Int) {
         countDownTimer?.cancel()
         countDownTimer = object : CountDownTimer(durationSeconds * 1000L, 1000L) {
@@ -78,7 +98,11 @@ class BlockActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(TAG, "onDestroy called")
         countDownTimer?.cancel()
+        if (!isBlockComplete) {
+            Log.w(TAG, "Activity destroyed before block completion")
+        }
     }
     
     private fun setupWindowFlags() {
@@ -122,10 +146,26 @@ class BlockActivity : ComponentActivity() {
     }
     
     override fun onBackPressed() {
+        Log.d(TAG, "Back button pressed - ignored")
         // Do nothing - prevent back button from closing the block screen
     }
     
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Block home, back, and recent apps buttons
+        return when (keyCode) {
+            KeyEvent.KEYCODE_HOME,
+            KeyEvent.KEYCODE_BACK,
+            KeyEvent.KEYCODE_APP_SWITCH -> {
+                Log.d(TAG, "Key blocked: $keyCode")
+                true
+            }
+            else -> super.onKeyDown(keyCode, event)
+        }
+    }
+    
     private fun finishBlock() {
+        Log.d(TAG, "finishBlock called")
+        isBlockComplete = true
         BlockAccessibilityService.isBlockActive = false
         
         val intent = Intent("com.screenrest.app.ACTION_BLOCK_COMPLETE")

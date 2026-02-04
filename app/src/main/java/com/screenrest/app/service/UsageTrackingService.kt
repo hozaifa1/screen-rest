@@ -352,17 +352,28 @@ class UsageTrackingService : LifecycleService() {
             BlockAccessibilityService.isBlockActive = true
             Log.d(TAG, "Set isBlockActive = true")
             
-            val intent = Intent(this, BlockActivity::class.java).apply {
+            // Use overlay service for reliable blocking
+            val overlayIntent = Intent(this, BlockOverlayService::class.java).apply {
+                putExtra(BlockOverlayService.EXTRA_DURATION_SECONDS, breakConfig.blockDurationSeconds)
+                putExtra(BlockOverlayService.EXTRA_MESSAGE, "Take a break")
+            }
+            startService(overlayIntent)
+            Log.w(TAG, "✅ BlockOverlayService started")
+            
+            // Also launch activity as backup fallback
+            val activityIntent = Intent(this, BlockActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_NO_HISTORY
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
             }
             
-            Log.w(TAG, "Starting BlockActivity...")
-            startActivity(intent)
-            Log.w(TAG, "✅ BlockActivity started successfully")
+            try {
+                startActivity(activityIntent)
+                Log.d(TAG, "BlockActivity also launched as backup")
+            } catch (e: Exception) {
+                Log.w(TAG, "BlockActivity launch failed (not critical): ${e.message}")
+            }
             
             resetTrackingTimestamp()
             lifecycleScope.launch {
@@ -370,7 +381,7 @@ class UsageTrackingService : LifecycleService() {
             }
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ FAILED TO START BLOCK ACTIVITY: ${e.message}", e)
+            Log.e(TAG, "❌ FAILED TO START BLOCK: ${e.message}", e)
             BlockAccessibilityService.isBlockActive = false
             
             resetTrackingTimestamp()
