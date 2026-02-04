@@ -1,23 +1,25 @@
 package com.screenrest.app.presentation.main
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.screenrest.app.data.repository.SettingsRepository
 import com.screenrest.app.domain.model.BreakConfig
 import com.screenrest.app.domain.model.EnforcementLevel
 import com.screenrest.app.domain.model.PermissionStatus
+import com.screenrest.app.domain.model.TrackingMode
 import com.screenrest.app.domain.usecase.CheckPermissionsUseCase
 import com.screenrest.app.service.ServiceController
 import com.screenrest.app.service.UsageTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -28,13 +30,19 @@ class HomeViewModel @Inject constructor(
     private val checkPermissionsUseCase: CheckPermissionsUseCase
 ) : ViewModel() {
     
+    companion object {
+        private const val TAG = "HomeViewModel"
+    }
+    
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    
+    private var timerJob: Job? = null
     
     init {
         observeState()
         refreshStatus()
-        startCountdownTimer()
+        startTimer()
     }
     
     private fun observeState() {
@@ -53,62 +61,55 @@ class HomeViewModel @Inject constructor(
         }
     }
     
-    private fun startCountdownTimer() {
-        viewModelScope.launch {
-            while (isActive) {
-                updateCountdown()
+    private fun startTimer() {
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            Log.d(TAG, "Timer started")
+            while (true) {
+                try {
+                    updateTimerDisplay()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating timer", e)
+                }
                 delay(1000L)
             }
         }
     }
     
-    private fun updateCountdown() {
-        val breakConfig = _uiState.value.breakConfig
-        val thresholdMs = breakConfig.usageThresholdSeconds * 1_000L
+    private fun updateTimerDisplay() {
+        val config = _uiState.value.breakConfig
+        val thresholdMs = config.usageThresholdSeconds * 1000L
+        val now = System.currentTimeMillis()
         
-        val currentUsageMs = calculateRealtimeUsage(breakConfig)
-        val remainingMs = (thresholdMs - currentUsageMs).coerceAtLeast(0L)
+        val usageMs = when (config.trackingMode) {
+            TrackingMode.CONTINUOUS -> now - UsageTrackingService.lastBreakTimestampMs
+            TrackingMode.CUMULATIVE_DAILY -> UsageTrackingService.currentUsageMs
+        }
         
-        val usedMinutes = (currentUsageMs / 60_000).toInt()
-        val usedSeconds = ((currentUsageMs % 60_000) / 1000).toInt()
-        
-        val remainingMinutes = (remainingMs / 60_000).toInt()
-        val remainingSeconds = ((remainingMs % 60_000) / 1000).toInt()
+        val remainingMs = (thresholdMs - usageMs).coerceAtLeast(0L)
         
         _uiState.value = _uiState.value.copy(
-            usedTimeMinutes = usedMinutes,
-            usedTimeSeconds = usedSeconds,
-            remainingTimeMinutes = remainingMinutes,
-            remainingTimeSeconds = remainingSeconds
+            usedTimeMinutes = (usageMs / 60000).toInt(),
+            usedTimeSeconds = ((usageMs % 60000) / 1000).toInt(),
+            remainingTimeMinutes = (remainingMs / 60000).toInt(),
+            remainingTimeSeconds = ((remainingMs % 60000) / 1000).toInt()
         )
-    }
-    
-    private fun calculateRealtimeUsage(breakConfig: com.screenrest.app.domain.model.BreakConfig): Long {
-        val lastBreakMs = UsageTrackingService.lastBreakTimestampMs
-        val currentTime = System.currentTimeMillis()
-        
-        return when (breakConfig.trackingMode) {
-            com.screenrest.app.domain.model.TrackingMode.CONTINUOUS -> {
-                currentTime - lastBreakMs
-            }
-            com.screenrest.app.domain.model.TrackingMode.CUMULATIVE_DAILY -> {
-                UsageTrackingService.currentUsageMs
-            }
-        }
     }
     
     fun refreshStatus() {
-        val permissions = checkPermissionsUseCase()
-        val enforcementLevel = checkPermissionsUseCase.calculateEnforcementLevel(permissions)
-        val isRunning = ServiceController.isRunning(context)
-        
-        _uiState.value = _uiState.value.copy(
-            permissionStatus = permissions,
-            enforcementLevel = enforcementLevel,
-            isServiceRunning = isRunning
-        )
-        
-        updateCountdown()
+        try {
+            val permissions = checkPermissionsUseCase()
+            val enforcementLevel = checkPermissionsUseCase.calculateEnforcementLevel(permissions)
+            val isRunning = ServiceController.isRunning(context)
+            
+            _uiState.value = _uiState.value.copy(
+                permissionStatus = permissions,
+                enforcementLevel = enforcementLevel,
+                isServiceRunning = isRunning
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error refreshing status", e)
+        }
     }
     
     fun toggleService() {

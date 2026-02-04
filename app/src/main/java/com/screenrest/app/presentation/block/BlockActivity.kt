@@ -3,6 +3,7 @@ package com.screenrest.app.presentation.block
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -12,31 +13,47 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.screenrest.app.service.BlockAccessibilityService
+import com.screenrest.app.presentation.theme.ScreenRestTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class BlockActivity : ComponentActivity() {
     
+    companion object {
+        private const val TAG = "BlockActivity"
+    }
+    
     private val viewModel: BlockViewModel by viewModels()
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "BlockActivity onCreate started")
         
-        setupWindowFlags()
-        setupImmersiveMode()
-        
-        val duration = intent.getIntExtra("BLOCK_DURATION_SECONDS", 30)
-        viewModel.startCountdown(duration) {
+        try {
+            setupWindowFlags()
+            setupImmersiveMode()
+            
+            val duration = intent.getIntExtra("BLOCK_DURATION_SECONDS", 30)
+            Log.d(TAG, "Block duration: $duration seconds")
+            
+            viewModel.startCountdown(duration) {
+                finishBlock()
+            }
+            
+            setContent {
+                ScreenRestTheme {
+                    val state by viewModel.state.collectAsState()
+                    BlockScreen(
+                        remainingSeconds = state.remainingSeconds,
+                        displayMessage = state.displayMessage,
+                        isLoading = state.isLoading
+                    )
+                }
+            }
+            Log.d(TAG, "BlockActivity onCreate completed successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in BlockActivity onCreate", e)
             finishBlock()
-        }
-        
-        setContent {
-            val state by viewModel.state.collectAsState()
-            BlockScreen(
-                remainingSeconds = state.remainingSeconds,
-                displayMessage = state.displayMessage,
-                isLoading = state.isLoading
-            )
         }
     }
     
