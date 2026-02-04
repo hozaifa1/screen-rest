@@ -48,7 +48,7 @@ fun ConfigSummaryCard(
             
             ConfigItem(
                 label = "Break After",
-                value = "${breakConfig.usageThresholdMinutes} min of ${
+                value = "${formatDuration(breakConfig.usageThresholdSeconds)} of ${
                     when (breakConfig.trackingMode) {
                         TrackingMode.CONTINUOUS -> "continuous"
                         TrackingMode.CUMULATIVE_DAILY -> "cumulative"

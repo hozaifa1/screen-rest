@@ -9,12 +9,12 @@ class UpdateBreakConfigUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(config: BreakConfig): Result<Unit> {
         return try {
-            if (config.usageThresholdMinutes < 1 || config.usageThresholdMinutes > 240) {
-                return Result.failure(IllegalArgumentException("Usage threshold must be between 1 and 240 minutes"))
+            if (config.usageThresholdSeconds < 1 || config.usageThresholdSeconds > 86400) {
+                return Result.failure(IllegalArgumentException("Usage threshold must be between 1 second and 24 hours"))
             }
             
-            if (config.blockDurationSeconds < 10 || config.blockDurationSeconds > 300) {
-                return Result.failure(IllegalArgumentException("Block duration must be between 10 and 300 seconds"))
+            if (config.blockDurationSeconds < 1 || config.blockDurationSeconds > 7200) {
+                return Result.failure(IllegalArgumentException("Block duration must be between 1 second and 2 hours"))
             }
             
             if (config.locationEnabled) {

@@ -44,9 +44,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
     
-    fun updateThreshold(minutes: Int) {
+    fun updateThresholdSeconds(seconds: Int) {
         viewModelScope.launch {
-            val config = _uiState.value.breakConfig.copy(usageThresholdMinutes = minutes)
+            val config = _uiState.value.breakConfig.copy(usageThresholdSeconds = seconds)
             updateBreakConfigUseCase(config)
         }
     }

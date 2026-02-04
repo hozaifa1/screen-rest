@@ -64,7 +64,7 @@ class HomeViewModel @Inject constructor(
     
     private fun updateCountdown() {
         val breakConfig = _uiState.value.breakConfig
-        val thresholdMs = breakConfig.usageThresholdMinutes * 60_000L
+        val thresholdMs = breakConfig.usageThresholdSeconds * 1_000L
         
         val currentUsageMs = calculateRealtimeUsage(breakConfig)
         val remainingMs = (thresholdMs - currentUsageMs).coerceAtLeast(0L)

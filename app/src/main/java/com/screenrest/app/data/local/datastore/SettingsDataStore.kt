@@ -26,7 +26,7 @@ class SettingsDataStore @Inject constructor(
     private val context: Context
 ) {
     private object PreferencesKeys {
-        val USAGE_THRESHOLD_MINUTES = intPreferencesKey("usage_threshold_minutes")
+        val USAGE_THRESHOLD_SECONDS = intPreferencesKey("usage_threshold_seconds")
         val BLOCK_DURATION_SECONDS = intPreferencesKey("block_duration_seconds")
         val TRACKING_MODE = stringPreferencesKey("tracking_mode")
         val LOCATION_ENABLED = booleanPreferencesKey("location_enabled")
@@ -42,7 +42,7 @@ class SettingsDataStore @Inject constructor(
 
     val breakConfig: Flow<BreakConfig> = context.dataStore.data.map { preferences ->
         BreakConfig(
-            usageThresholdMinutes = preferences[PreferencesKeys.USAGE_THRESHOLD_MINUTES] ?: 20,
+            usageThresholdSeconds = preferences[PreferencesKeys.USAGE_THRESHOLD_SECONDS] ?: 300,
             blockDurationSeconds = preferences[PreferencesKeys.BLOCK_DURATION_SECONDS] ?: 30,
             trackingMode = TrackingMode.valueOf(
                 preferences[PreferencesKeys.TRACKING_MODE] ?: TrackingMode.CONTINUOUS.name
@@ -73,7 +73,7 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun updateBreakConfig(config: BreakConfig) {
         context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.USAGE_THRESHOLD_MINUTES] = config.usageThresholdMinutes
+            preferences[PreferencesKeys.USAGE_THRESHOLD_SECONDS] = config.usageThresholdSeconds
             preferences[PreferencesKeys.BLOCK_DURATION_SECONDS] = config.blockDurationSeconds
             preferences[PreferencesKeys.TRACKING_MODE] = config.trackingMode.name
             preferences[PreferencesKeys.LOCATION_ENABLED] = config.locationEnabled

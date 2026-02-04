@@ -65,7 +65,7 @@ fun HomeScreen(
                     usedSeconds = uiState.usedTimeSeconds,
                     remainingMinutes = uiState.remainingTimeMinutes,
                     remainingSeconds = uiState.remainingTimeSeconds,
-                    thresholdMinutes = uiState.breakConfig.usageThresholdMinutes
+                    thresholdSeconds = uiState.breakConfig.usageThresholdSeconds
                 )
             }
             
@@ -107,7 +107,7 @@ private fun CountdownTimerCard(
     usedSeconds: Int,
     remainingMinutes: Int,
     remainingSeconds: Int,
-    thresholdMinutes: Int
+    thresholdSeconds: Int
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -174,7 +174,7 @@ private fun CountdownTimerCard(
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "${thresholdMinutes}m",
+                        text = formatThreshold(thresholdSeconds),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -187,5 +187,13 @@ private fun CountdownTimerCard(
                 }
             }
         }
+    }
+}
+
+private fun formatThreshold(seconds: Int): String {
+    return when {
+        seconds < 60 -> "${seconds}s"
+        seconds % 60 == 0 -> "${seconds / 60}m"
+        else -> "${seconds / 60}m ${seconds % 60}s"
     }
 }

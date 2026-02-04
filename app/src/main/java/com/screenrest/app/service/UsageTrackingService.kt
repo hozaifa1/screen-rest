@@ -190,7 +190,7 @@ class UsageTrackingService : LifecycleService() {
     
     private suspend fun performTrackingCycle() {
         val breakConfig = settingsRepository.breakConfig.first()
-        thresholdMs = breakConfig.usageThresholdMinutes * 60_000L
+        thresholdMs = breakConfig.usageThresholdSeconds * 1_000L
         
         checkDailyReset(breakConfig)
         
@@ -202,7 +202,7 @@ class UsageTrackingService : LifecycleService() {
         
         Log.d(TAG, "==================== TRACKING CYCLE ====================")
         Log.d(TAG, "Current Usage: ${currentUsageMs}ms (${currentUsageMinutes}m ${currentUsageSeconds}s)")
-        Log.d(TAG, "Threshold: ${thresholdMs}ms (${breakConfig.usageThresholdMinutes}m)")
+        Log.d(TAG, "Threshold: ${thresholdMs}ms (${breakConfig.usageThresholdSeconds}s)")
         Log.d(TAG, "Threshold Reached: $thresholdReached")
         Log.d(TAG, "Screen On: $isScreenOn")
         Log.d(TAG, "Block Active: ${BlockAccessibilityService.isBlockActive}")

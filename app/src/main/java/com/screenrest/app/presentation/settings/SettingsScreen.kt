@@ -15,7 +15,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.screenrest.app.domain.model.ThemeMode
 import com.screenrest.app.domain.model.TrackingMode
 import com.screenrest.app.presentation.settings.components.TrackingModeSelector
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +56,7 @@ fun SettingsScreen(
         ) {
             BreakConfigurationSection(
                 breakConfig = uiState.breakConfig,
-                onThresholdChange = { viewModel.updateThreshold(it) },
+                onThresholdSecondsChange = { viewModel.updateThresholdSeconds(it) },
                 onDurationChange = { viewModel.updateDuration(it) },
                 onTrackingModeChange = { viewModel.updateTrackingMode(it) }
             )
@@ -87,10 +86,23 @@ fun SettingsScreen(
 @Composable
 private fun BreakConfigurationSection(
     breakConfig: com.screenrest.app.domain.model.BreakConfig,
-    onThresholdChange: (Int) -> Unit,
+    onThresholdSecondsChange: (Int) -> Unit,
     onDurationChange: (Int) -> Unit,
     onTrackingModeChange: (TrackingMode) -> Unit
 ) {
+    var thresholdMinutesText by remember(breakConfig.usageThresholdSeconds) { 
+        mutableStateOf((breakConfig.usageThresholdSeconds / 60).toString()) 
+    }
+    var thresholdSecondsText by remember(breakConfig.usageThresholdSeconds) { 
+        mutableStateOf((breakConfig.usageThresholdSeconds % 60).toString()) 
+    }
+    var durationMinutesText by remember(breakConfig.blockDurationSeconds) { 
+        mutableStateOf((breakConfig.blockDurationSeconds / 60).toString()) 
+    }
+    var durationSecondsText by remember(breakConfig.blockDurationSeconds) { 
+        mutableStateOf((breakConfig.blockDurationSeconds % 60).toString()) 
+    }
+    
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -101,44 +113,92 @@ private fun BreakConfigurationSection(
         )
         
         Text(
-            text = "Usage Threshold",
+            text = "Usage Threshold (trigger break after)",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
         
-        Text(
-            text = "${breakConfig.usageThresholdMinutes} minutes",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        Slider(
-            value = breakConfig.usageThresholdMinutes.toFloat(),
-            onValueChange = { onThresholdChange(it.roundToInt()) },
-            valueRange = 5f..120f,
-            steps = 22
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = thresholdMinutesText,
+                onValueChange = { value ->
+                    if (value.all { it.isDigit() } && value.length <= 4) {
+                        thresholdMinutesText = value
+                        val minutes = value.toIntOrNull() ?: 0
+                        val seconds = thresholdSecondsText.toIntOrNull() ?: 0
+                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 86400)
+                        onThresholdSecondsChange(totalSeconds)
+                    }
+                },
+                label = { Text("Min") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            
+            OutlinedTextField(
+                value = thresholdSecondsText,
+                onValueChange = { value ->
+                    if (value.all { it.isDigit() } && value.length <= 2) {
+                        thresholdSecondsText = value
+                        val minutes = thresholdMinutesText.toIntOrNull() ?: 0
+                        val seconds = (value.toIntOrNull() ?: 0).coerceIn(0, 59)
+                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 86400)
+                        onThresholdSecondsChange(totalSeconds)
+                    }
+                },
+                label = { Text("Sec") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+        }
         
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Break Duration",
+            text = "Break Duration (block screen for)",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
         
-        Text(
-            text = formatDuration(breakConfig.blockDurationSeconds),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        Slider(
-            value = breakConfig.blockDurationSeconds.toFloat(),
-            onValueChange = { onDurationChange(it.roundToInt()) },
-            valueRange = 5f..300f,
-            steps = 58
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = durationMinutesText,
+                onValueChange = { value ->
+                    if (value.all { it.isDigit() } && value.length <= 3) {
+                        durationMinutesText = value
+                        val minutes = value.toIntOrNull() ?: 0
+                        val seconds = durationSecondsText.toIntOrNull() ?: 0
+                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 7200)
+                        onDurationChange(totalSeconds)
+                    }
+                },
+                label = { Text("Min") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            
+            OutlinedTextField(
+                value = durationSecondsText,
+                onValueChange = { value ->
+                    if (value.all { it.isDigit() } && value.length <= 2) {
+                        durationSecondsText = value
+                        val minutes = durationMinutesText.toIntOrNull() ?: 0
+                        val seconds = (value.toIntOrNull() ?: 0).coerceIn(0, 59)
+                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 7200)
+                        onDurationChange(totalSeconds)
+                    }
+                },
+                label = { Text("Sec") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+        }
         
         Spacer(modifier = Modifier.height(8.dp))
         
