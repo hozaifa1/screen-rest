@@ -26,26 +26,34 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.screenrest.app.domain.model.DisplayMessage
+import com.screenrest.app.domain.usecase.GetRandomDisplayMessageUseCase
 import com.screenrest.app.presentation.theme.ScreenRestTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
     companion object {
         private const val TAG = "BlockOverlayService"
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
-        const val EXTRA_MESSAGE = "message"
         
         @Volatile
         var isOverlayActive = false
             private set
     }
+
+    @Inject
+    lateinit var getRandomDisplayMessageUseCase: GetRandomDisplayMessageUseCase
 
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
@@ -56,6 +64,7 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     private var countdownJob: Job? = null
     private var remainingSeconds by mutableIntStateOf(30)
     private var displayMessage by mutableStateOf("Take a break")
+    private var displayMessageArabic by mutableStateOf("")
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val viewModelStore: ViewModelStore get() = store
@@ -70,18 +79,45 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val duration = intent?.getIntExtra(EXTRA_DURATION_SECONDS, 30) ?: 30
-        val message = intent?.getStringExtra(EXTRA_MESSAGE) ?: "Take a break"
         
-        Log.d(TAG, "Starting overlay with duration=$duration, message=$message")
+        Log.d(TAG, "Starting overlay with duration=$duration")
         
         remainingSeconds = duration
-        displayMessage = message
+        
+        // Fetch actual message from use case
+        lifecycleScope.launch {
+            try {
+                val message = getRandomDisplayMessageUseCase()
+                when (message) {
+                    is DisplayMessage.Custom -> {
+                        displayMessage = message.text
+                        displayMessageArabic = ""
+                        Log.d(TAG, "Loaded custom message: ${message.text}")
+                    }
+                    is DisplayMessage.QuranAyah -> {
+                        displayMessage = message.ayah.englishTranslation
+                        displayMessageArabic = message.ayah.arabicText
+                        Log.d(TAG, "Loaded Quran ayah: ${message.ayah.surahName} ${message.ayah.ayahNumber}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading message", e)
+                displayMessage = "Take a moment to rest your eyes and reflect."
+                displayMessageArabic = ""
+            }
+        }
         
         if (overlayView == null) {
             showOverlay()
+            // Start countdown after overlay is shown
+            lifecycleScope.launch {
+                delay(100) // Brief delay to ensure UI is ready
+                startCountdown(duration)
+            }
+        } else {
+            // Overlay already exists, start countdown immediately
+            startCountdown(duration)
         }
-        
-        startCountdown(duration)
         
         return START_NOT_STICKY
     }
@@ -104,7 +140,8 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                     ScreenRestTheme {
                         BlockOverlayContent(
                             remainingSeconds = remainingSeconds,
-                            displayMessage = displayMessage
+                            displayMessage = displayMessage,
+                            displayMessageArabic = displayMessageArabic
                         )
                     }
                 }
@@ -148,17 +185,18 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     private fun startCountdown(durationSeconds: Int) {
         countdownJob?.cancel()
-        countdownJob = CoroutineScope(Dispatchers.Main).launch {
+        countdownJob = lifecycleScope.launch {
             remainingSeconds = durationSeconds
+            Log.d(TAG, "Countdown started: $durationSeconds seconds")
             
-            repeat(durationSeconds) {
+            while (remainingSeconds > 0) {
                 delay(1000)
                 remainingSeconds--
-                
-                if (remainingSeconds <= 0) {
-                    finishBlock()
-                }
+                Log.v(TAG, "Countdown: $remainingSeconds seconds remaining")
             }
+            
+            Log.d(TAG, "Countdown finished, dismissing overlay")
+            finishBlock()
         }
     }
 
@@ -197,7 +235,8 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 @Composable
 private fun BlockOverlayContent(
     remainingSeconds: Int,
-    displayMessage: String
+    displayMessage: String,
+    displayMessageArabic: String
 ) {
     val minutes = remainingSeconds / 60
     val seconds = remainingSeconds % 60
@@ -210,8 +249,11 @@ private fun BlockOverlayContent(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier
+                .padding(24.dp)
+                .fillMaxWidth()
         ) {
+            // Timer countdown
             Text(
                 text = String.format("%d:%02d", minutes, seconds),
                 fontSize = 72.sp,
@@ -219,22 +261,40 @@ private fun BlockOverlayContent(
                 color = Color.White
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
             
+            // Arabic text if available (Quran verse)
+            if (displayMessageArabic.isNotEmpty()) {
+                Text(
+                    text = displayMessageArabic,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF4CAF50),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 48.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+            
+            // Translation or custom message
             Text(
                 text = displayMessage,
-                fontSize = 24.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.9f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                lineHeight = 32.sp,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Text(
                 text = "Rest your eyes and relax",
                 fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center
             )
         }

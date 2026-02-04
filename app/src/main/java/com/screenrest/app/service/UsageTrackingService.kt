@@ -355,7 +355,6 @@ class UsageTrackingService : LifecycleService() {
             // Use overlay service for reliable blocking
             val overlayIntent = Intent(this, BlockOverlayService::class.java).apply {
                 putExtra(BlockOverlayService.EXTRA_DURATION_SECONDS, breakConfig.blockDurationSeconds)
-                putExtra(BlockOverlayService.EXTRA_MESSAGE, "Take a break")
             }
             startService(overlayIntent)
             Log.w(TAG, "✅ BlockOverlayService started")

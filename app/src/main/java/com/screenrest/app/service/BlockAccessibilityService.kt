@@ -46,7 +46,6 @@ class BlockAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "Overlay not active, restarting overlay service")
                 val overlayIntent = Intent(this, BlockOverlayService::class.java).apply {
                     putExtra(BlockOverlayService.EXTRA_DURATION_SECONDS, 30)
-                    putExtra(BlockOverlayService.EXTRA_MESSAGE, "Take a break")
                 }
                 startService(overlayIntent)
             }
