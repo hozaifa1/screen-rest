@@ -65,6 +65,9 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     private var remainingSeconds by mutableIntStateOf(30)
     private var displayMessage by mutableStateOf("Take a break")
     private var displayMessageArabic by mutableStateOf("")
+    
+    private var isInitialized = false
+    private var isCountdownRunning = false
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val viewModelStore: ViewModelStore get() = store
@@ -78,44 +81,49 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Prevent multiple simultaneous initializations
+        if (isInitialized) {
+            Log.w(TAG, "Service already initialized, ignoring duplicate start")
+            return START_NOT_STICKY
+        }
+        
         val duration = intent?.getIntExtra(EXTRA_DURATION_SECONDS, 30) ?: 30
+        Log.d(TAG, "⭐ Starting overlay with duration=$duration (first time)")
         
-        Log.d(TAG, "Starting overlay with duration=$duration")
-        
+        isInitialized = true
+        isOverlayActive = true
         remainingSeconds = duration
         
-        // Fetch actual message from use case
+        // Load message BEFORE showing overlay to prevent rotation
         lifecycleScope.launch {
             try {
+                Log.d(TAG, "Fetching display message...")
                 val message = getRandomDisplayMessageUseCase()
                 when (message) {
                     is DisplayMessage.Custom -> {
                         displayMessage = message.text
                         displayMessageArabic = ""
-                        Log.d(TAG, "Loaded custom message: ${message.text}")
+                        Log.d(TAG, "✅ Loaded custom message: ${message.text.take(50)}...")
                     }
                     is DisplayMessage.QuranAyah -> {
                         displayMessage = message.ayah.englishTranslation
                         displayMessageArabic = message.ayah.arabicText
-                        Log.d(TAG, "Loaded Quran ayah: ${message.ayah.surahName} ${message.ayah.ayahNumber}")
+                        Log.d(TAG, "✅ Loaded Quran ayah: ${message.ayah.surahName} ${message.ayah.ayahNumber}")
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading message", e)
+                Log.e(TAG, "❌ Error loading message", e)
                 displayMessage = "Take a moment to rest your eyes and reflect."
                 displayMessageArabic = ""
             }
-        }
-        
-        if (overlayView == null) {
-            showOverlay()
-            // Start countdown after overlay is shown
-            lifecycleScope.launch {
-                delay(100) // Brief delay to ensure UI is ready
-                startCountdown(duration)
+            
+            // Now show overlay with loaded message
+            if (overlayView == null) {
+                showOverlay()
             }
-        } else {
-            // Overlay already exists, start countdown immediately
+            
+            // Start countdown after brief delay
+            delay(200)
             startCountdown(duration)
         }
         
@@ -184,24 +192,38 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     }
 
     private fun startCountdown(durationSeconds: Int) {
+        if (isCountdownRunning) {
+            Log.w(TAG, "⚠️ Countdown already running, ignoring duplicate start")
+            return
+        }
+        
+        isCountdownRunning = true
         countdownJob?.cancel()
+        
         countdownJob = lifecycleScope.launch {
             remainingSeconds = durationSeconds
-            Log.d(TAG, "Countdown started: $durationSeconds seconds")
+            Log.d(TAG, "⏱️ Countdown started: $durationSeconds seconds")
             
-            while (remainingSeconds > 0) {
+            while (remainingSeconds > 0 && isCountdownRunning) {
                 delay(1000)
                 remainingSeconds--
-                Log.v(TAG, "Countdown: $remainingSeconds seconds remaining")
+                if (remainingSeconds % 5 == 0 || remainingSeconds <= 3) {
+                    Log.d(TAG, "⏱️ Countdown: $remainingSeconds seconds remaining")
+                }
             }
             
-            Log.d(TAG, "Countdown finished, dismissing overlay")
-            finishBlock()
+            if (isCountdownRunning) {
+                Log.d(TAG, "✅ Countdown finished, dismissing overlay")
+                finishBlock()
+            } else {
+                Log.d(TAG, "⚠️ Countdown cancelled")
+            }
         }
     }
 
     private fun finishBlock() {
-        Log.d(TAG, "Block finished, removing overlay")
+        Log.d(TAG, "🏁 Block finished, removing overlay")
+        isCountdownRunning = false
         isOverlayActive = false
         BlockAccessibilityService.isBlockActive = false
         
@@ -213,7 +235,11 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(TAG, "🔴 Service being destroyed")
+        
+        isCountdownRunning = false
         countdownJob?.cancel()
+        countdownJob = null
         
         try {
             if (overlayView != null && windowManager != null) {
@@ -226,7 +252,8 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         isOverlayActive = false
-        Log.d(TAG, "BlockOverlayService destroyed")
+        isInitialized = false
+        Log.d(TAG, "✅ BlockOverlayService destroyed")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

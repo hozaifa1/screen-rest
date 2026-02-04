@@ -52,9 +52,13 @@ class UsageTrackingService : LifecycleService() {
         var thresholdMs: Long = 0L
             private set
         
+        @Volatile
+        private var hasTriggeredBlockThisCycle = false
+        
         fun resetTrackingTimestamp() {
             lastBreakTimestampMs = System.currentTimeMillis()
             currentUsageMs = 0L
+            hasTriggeredBlockThisCycle = false
         }
     }
     
@@ -219,13 +223,13 @@ class UsageTrackingService : LifecycleService() {
         checkDailyReset(breakConfig)
         
         currentUsageMs = calculateCurrentUsage(breakConfig)
-        val currentUsageMinutes = (currentUsageMs / 60_000).toInt()
-        val currentUsageSeconds = ((currentUsageMs % 60_000) / 1000).toInt()
         
         val thresholdReached = currentUsageMs >= thresholdMs
         
-        if (thresholdReached && !BlockAccessibilityService.isBlockActive) {
-            Log.w(TAG, "⚠️ THRESHOLD REACHED! Attempting to trigger block...")
+        // Only trigger block ONCE per threshold cycle
+        if (thresholdReached && !hasTriggeredBlockThisCycle && !BlockAccessibilityService.isBlockActive && !BlockOverlayService.isOverlayActive) {
+            Log.w(TAG, "⚠️ THRESHOLD REACHED! Attempting to trigger block (FIRST TIME THIS CYCLE)...")
+            hasTriggeredBlockThisCycle = true
             
             if (breakConfig.locationEnabled) {
                 val inLocation = isInTargetLocation(breakConfig)
@@ -235,18 +239,24 @@ class UsageTrackingService : LifecycleService() {
                 } else {
                     Log.w(TAG, "❌ BLOCK SKIPPED (outside location)")
                     updateNotification("Outside target location - ${formatTime(currentUsageMs)}")
+                    hasTriggeredBlockThisCycle = false // Allow retry if location changes
                 }
             } else {
                 attemptBlockLaunch(breakConfig)
             }
         } else {
-            if (thresholdReached) {
-                Log.d(TAG, "Threshold reached but block already active")
+            if (thresholdReached && hasTriggeredBlockThisCycle) {
+                Log.v(TAG, "Threshold reached but already triggered block this cycle")
+                updateNotification("Block screen active - please wait")
+            } else if (thresholdReached && (BlockAccessibilityService.isBlockActive || BlockOverlayService.isOverlayActive)) {
+                Log.v(TAG, "Threshold reached but block already active/showing")
+                updateNotification("Block screen active - please wait")
+            } else if (!thresholdReached) {
+                val remainingMs = thresholdMs - currentUsageMs
+                val remainingMinutes = (remainingMs / 60_000).toInt()
+                val remainingSeconds = ((remainingMs % 60_000) / 1000).toInt()
+                updateNotification("Used: ${formatTime(currentUsageMs)} | Break in ${remainingMinutes}m ${remainingSeconds}s")
             }
-            val remainingMs = thresholdMs - currentUsageMs
-            val remainingMinutes = (remainingMs / 60_000).toInt()
-            val remainingSeconds = ((remainingMs % 60_000) / 1000).toInt()
-            updateNotification("Used: ${formatTime(currentUsageMs)} | Break in ${remainingMinutes}m ${remainingSeconds}s")
         }
     }
     
@@ -357,22 +367,7 @@ class UsageTrackingService : LifecycleService() {
                 putExtra(BlockOverlayService.EXTRA_DURATION_SECONDS, breakConfig.blockDurationSeconds)
             }
             startService(overlayIntent)
-            Log.w(TAG, "✅ BlockOverlayService started")
-            
-            // Also launch activity as backup fallback
-            val activityIntent = Intent(this, BlockActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra("BLOCK_DURATION_SECONDS", breakConfig.blockDurationSeconds)
-            }
-            
-            try {
-                startActivity(activityIntent)
-                Log.d(TAG, "BlockActivity also launched as backup")
-            } catch (e: Exception) {
-                Log.w(TAG, "BlockActivity launch failed (not critical): ${e.message}")
-            }
+            Log.w(TAG, "✅ BlockOverlayService started (ONLY using overlay, no activity)")
             
             resetTrackingTimestamp()
             lifecycleScope.launch {

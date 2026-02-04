@@ -41,25 +41,18 @@ class BlockAccessibilityService : AccessibilityService() {
     
     private fun relaunchBlockScreens() {
         try {
-            // Relaunch overlay service if not active
-            if (!BlockOverlayService.isOverlayActive) {
-                Log.d(TAG, "Overlay not active, restarting overlay service")
-                val overlayIntent = Intent(this, BlockOverlayService::class.java).apply {
-                    putExtra(BlockOverlayService.EXTRA_DURATION_SECONDS, 30)
-                }
-                startService(overlayIntent)
+            // Only relaunch if overlay is NOT already active
+            if (BlockOverlayService.isOverlayActive) {
+                Log.d(TAG, "Overlay already active, no need to relaunch")
+                return
             }
             
-            // Also bring activity to front
-            val activityIntent = Intent(this, BlockActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or 
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            startActivity(activityIntent)
-            Log.d(TAG, "Block screens relaunched")
+            Log.w(TAG, "Overlay not active but should be - user switched apps during block")
+            // Don't relaunch - let the overlay handle it
+            // Relaunching causes duplicate service calls and message rotation
+            
         } catch (e: Exception) {
-            Log.e(TAG, "Error relaunching block screens", e)
+            Log.e(TAG, "Error in relaunchBlockScreens", e)
         }
     }
 }
