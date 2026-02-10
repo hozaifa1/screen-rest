@@ -81,14 +81,13 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Prevent multiple simultaneous initializations
         if (isInitialized) {
             Log.w(TAG, "Service already initialized, ignoring duplicate start")
             return START_NOT_STICKY
         }
         
         val duration = intent?.getIntExtra(EXTRA_DURATION_SECONDS, 30) ?: 30
-        Log.d(TAG, "⭐ Starting overlay with duration=$duration (first time)")
+        Log.d(TAG, "Starting overlay with duration=$duration")
         
         isInitialized = true
         isOverlayActive = true
@@ -97,22 +96,19 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         // Load message BEFORE showing overlay to prevent rotation
         lifecycleScope.launch {
             try {
-                Log.d(TAG, "Fetching display message...")
                 val message = getRandomDisplayMessageUseCase()
                 when (message) {
                     is DisplayMessage.Custom -> {
                         displayMessage = message.text
                         displayMessageArabic = ""
-                        Log.d(TAG, "✅ Loaded custom message: ${message.text.take(50)}...")
                     }
                     is DisplayMessage.QuranAyah -> {
                         displayMessage = message.ayah.englishTranslation
                         displayMessageArabic = message.ayah.arabicText
-                        Log.d(TAG, "✅ Loaded Quran ayah: ${message.ayah.surahName} ${message.ayah.ayahNumber}")
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error loading message", e)
+                Log.e(TAG, "Error loading message", e)
                 displayMessage = "Take a moment to rest your eyes and reflect."
                 displayMessageArabic = ""
             }
@@ -166,9 +162,8 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 layoutFlag,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                         WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                         WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                         WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD,
@@ -193,7 +188,7 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     private fun startCountdown(durationSeconds: Int) {
         if (isCountdownRunning) {
-            Log.w(TAG, "⚠️ Countdown already running, ignoring duplicate start")
+            Log.w(TAG, "Countdown already running, ignoring duplicate start")
             return
         }
         
@@ -202,30 +197,24 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         
         countdownJob = lifecycleScope.launch {
             remainingSeconds = durationSeconds
-            Log.d(TAG, "⏱️ Countdown started: $durationSeconds seconds")
+            Log.d(TAG, "Countdown started: $durationSeconds seconds")
             
             while (remainingSeconds > 0 && isCountdownRunning) {
                 delay(1000)
                 remainingSeconds--
-                if (remainingSeconds % 5 == 0 || remainingSeconds <= 3) {
-                    Log.d(TAG, "⏱️ Countdown: $remainingSeconds seconds remaining")
-                }
             }
             
             if (isCountdownRunning) {
-                Log.d(TAG, "✅ Countdown finished, dismissing overlay")
+                Log.d(TAG, "Countdown finished, dismissing overlay")
                 finishBlock()
-            } else {
-                Log.d(TAG, "⚠️ Countdown cancelled")
             }
         }
     }
 
     private fun finishBlock() {
-        Log.d(TAG, "🏁 Block finished, removing overlay")
+        Log.d(TAG, "Block finished, removing overlay")
         isCountdownRunning = false
         isOverlayActive = false
-        BlockAccessibilityService.isBlockActive = false
         
         val intent = Intent("com.screenrest.app.ACTION_BLOCK_COMPLETE")
         sendBroadcast(intent)
@@ -235,7 +224,7 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "🔴 Service being destroyed")
+        Log.d(TAG, "Service being destroyed")
         
         isCountdownRunning = false
         countdownJob?.cancel()
@@ -253,7 +242,6 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         isOverlayActive = false
         isInitialized = false
-        Log.d(TAG, "✅ BlockOverlayService destroyed")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

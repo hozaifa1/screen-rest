@@ -13,7 +13,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.screenrest.app.domain.model.BreakConfig
 import com.screenrest.app.domain.model.ThemeMode
-import com.screenrest.app.domain.model.TrackingMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -44,9 +43,6 @@ class SettingsDataStore @Inject constructor(
         BreakConfig(
             usageThresholdSeconds = preferences[PreferencesKeys.USAGE_THRESHOLD_SECONDS] ?: 300,
             blockDurationSeconds = preferences[PreferencesKeys.BLOCK_DURATION_SECONDS] ?: 30,
-            trackingMode = TrackingMode.valueOf(
-                preferences[PreferencesKeys.TRACKING_MODE] ?: TrackingMode.CONTINUOUS.name
-            ),
             locationEnabled = preferences[PreferencesKeys.LOCATION_ENABLED] ?: false,
             locationLat = preferences[PreferencesKeys.LOCATION_LAT],
             locationLng = preferences[PreferencesKeys.LOCATION_LNG],
@@ -75,7 +71,6 @@ class SettingsDataStore @Inject constructor(
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.USAGE_THRESHOLD_SECONDS] = config.usageThresholdSeconds
             preferences[PreferencesKeys.BLOCK_DURATION_SECONDS] = config.blockDurationSeconds
-            preferences[PreferencesKeys.TRACKING_MODE] = config.trackingMode.name
             preferences[PreferencesKeys.LOCATION_ENABLED] = config.locationEnabled
             config.locationLat?.let { preferences[PreferencesKeys.LOCATION_LAT] = it }
             config.locationLng?.let { preferences[PreferencesKeys.LOCATION_LNG] = it }

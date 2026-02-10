@@ -14,7 +14,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.screenrest.app.domain.model.TrackingMode
 import com.screenrest.app.presentation.main.components.ConfigSummaryCard
 import com.screenrest.app.presentation.main.components.StatusCard
 import com.screenrest.app.presentation.components.PermissionWarningCard
@@ -41,12 +40,8 @@ fun HomeScreen(
         }
     }
     
-    // Calculate timer values based on current time
     val thresholdMs = uiState.breakConfig.usageThresholdSeconds * 1000L
-    val usageMs = when (uiState.breakConfig.trackingMode) {
-        TrackingMode.CONTINUOUS -> currentTimeMs - UsageTrackingService.lastBreakTimestampMs
-        TrackingMode.CUMULATIVE_DAILY -> UsageTrackingService.currentUsageMs
-    }
+    val usageMs = UsageTrackingService.currentUsageMs
     val remainingMs = (thresholdMs - usageMs).coerceAtLeast(0L)
     
     val usedMinutes = (usageMs / 60000).toInt()

@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.screenrest.app.data.repository.SettingsRepository
 import com.screenrest.app.domain.model.BreakConfig
 import com.screenrest.app.domain.model.ThemeMode
-import com.screenrest.app.domain.model.TrackingMode
 import com.screenrest.app.domain.usecase.UpdateBreakConfigUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,13 +58,6 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(showLongDurationWarning = true)
             }
             
-            updateBreakConfigUseCase(config)
-        }
-    }
-    
-    fun updateTrackingMode(mode: TrackingMode) {
-        viewModelScope.launch {
-            val config = _uiState.value.breakConfig.copy(trackingMode = mode)
             updateBreakConfigUseCase(config)
         }
     }

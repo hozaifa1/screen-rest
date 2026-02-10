@@ -8,7 +8,6 @@ import com.screenrest.app.data.repository.SettingsRepository
 import com.screenrest.app.domain.model.BreakConfig
 import com.screenrest.app.domain.model.EnforcementLevel
 import com.screenrest.app.domain.model.PermissionStatus
-import com.screenrest.app.domain.model.TrackingMode
 import com.screenrest.app.domain.usecase.CheckPermissionsUseCase
 import com.screenrest.app.service.ServiceController
 import com.screenrest.app.service.UsageTrackingService
@@ -79,13 +78,7 @@ class HomeViewModel @Inject constructor(
     private fun updateTimerDisplay() {
         val config = _uiState.value.breakConfig
         val thresholdMs = config.usageThresholdSeconds * 1000L
-        val now = System.currentTimeMillis()
-        
-        val usageMs = when (config.trackingMode) {
-            TrackingMode.CONTINUOUS -> now - UsageTrackingService.lastBreakTimestampMs
-            TrackingMode.CUMULATIVE_DAILY -> UsageTrackingService.currentUsageMs
-        }
-        
+        val usageMs = UsageTrackingService.currentUsageMs
         val remainingMs = (thresholdMs - usageMs).coerceAtLeast(0L)
         
         _uiState.value = _uiState.value.copy(

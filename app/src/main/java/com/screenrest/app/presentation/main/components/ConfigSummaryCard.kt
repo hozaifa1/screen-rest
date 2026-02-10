@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.screenrest.app.domain.model.BreakConfig
-import com.screenrest.app.domain.model.TrackingMode
 
 @Composable
 fun ConfigSummaryCard(
@@ -48,12 +47,7 @@ fun ConfigSummaryCard(
             
             ConfigItem(
                 label = "Break After",
-                value = "${formatDuration(breakConfig.usageThresholdSeconds)} of ${
-                    when (breakConfig.trackingMode) {
-                        TrackingMode.CONTINUOUS -> "continuous"
-                        TrackingMode.CUMULATIVE_DAILY -> "cumulative"
-                    }
-                } usage"
+                value = "${formatDuration(breakConfig.usageThresholdSeconds)} of screen time"
             )
             
             Spacer(modifier = Modifier.height(8.dp))

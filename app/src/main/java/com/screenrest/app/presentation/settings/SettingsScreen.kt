@@ -13,8 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.screenrest.app.domain.model.ThemeMode
-import com.screenrest.app.domain.model.TrackingMode
-import com.screenrest.app.presentation.settings.components.TrackingModeSelector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,8 +55,7 @@ fun SettingsScreen(
             BreakConfigurationSection(
                 breakConfig = uiState.breakConfig,
                 onThresholdSecondsChange = { viewModel.updateThresholdSeconds(it) },
-                onDurationChange = { viewModel.updateDuration(it) },
-                onTrackingModeChange = { viewModel.updateTrackingMode(it) }
+                onDurationChange = { viewModel.updateDuration(it) }
             )
             
             HorizontalDivider()
@@ -87,8 +84,7 @@ fun SettingsScreen(
 private fun BreakConfigurationSection(
     breakConfig: com.screenrest.app.domain.model.BreakConfig,
     onThresholdSecondsChange: (Int) -> Unit,
-    onDurationChange: (Int) -> Unit,
-    onTrackingModeChange: (TrackingMode) -> Unit
+    onDurationChange: (Int) -> Unit
 ) {
     var thresholdMinutesText by remember(breakConfig.usageThresholdSeconds) { 
         mutableStateOf((breakConfig.usageThresholdSeconds / 60).toString()) 
@@ -200,12 +196,6 @@ private fun BreakConfigurationSection(
             )
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        TrackingModeSelector(
-            selectedMode = breakConfig.trackingMode,
-            onModeSelected = onTrackingModeChange
-        )
     }
 }
 
