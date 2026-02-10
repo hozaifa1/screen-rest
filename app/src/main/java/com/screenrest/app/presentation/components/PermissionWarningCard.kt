@@ -1,6 +1,7 @@
 package com.screenrest.app.presentation.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -22,49 +23,42 @@ fun PermissionWarningCard(
     permissionType: String
 ) {
     val context = LocalContext.current
-    
-    Card(
+
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.Top
         ) {
             Icon(
                 imageVector = Icons.Default.Warning,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(24.dp)
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(18.dp)
             )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                OutlinedButton(
+                Spacer(modifier = Modifier.height(8.dp))
+                FilledTonalButton(
                     onClick = {
                         when (permissionType) {
                             "usageStats" -> context.openUsageAccessSettings()
@@ -73,11 +67,11 @@ fun PermissionWarningCard(
                             "notification" -> context.openNotificationSettings()
                         }
                     },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(28.dp)
                 ) {
-                    Text("Fix Now")
+                    Text("Fix Now", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }

@@ -213,14 +213,6 @@ private fun SimpleBlockScreen(remainingSeconds: Int) {
                 color = Color.White.copy(alpha = 0.9f)
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "Rest your eyes and relax",
-                fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

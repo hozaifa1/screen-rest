@@ -1,11 +1,14 @@
 package com.screenrest.app.service
 
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
@@ -68,6 +71,26 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     
     private var isInitialized = false
     private var isCountdownRunning = false
+    private var isScreenOn = true
+    
+    private val powerManager by lazy {
+        getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
+    
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    isScreenOn = true
+                    Log.d(TAG, "Screen ON during block - countdown will resume")
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    isScreenOn = false
+                    Log.d(TAG, "Screen OFF during block - countdown paused")
+                }
+            }
+        }
+    }
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val viewModelStore: ViewModelStore get() = store
@@ -77,7 +100,15 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
-        Log.d(TAG, "BlockOverlayService created")
+        
+        isScreenOn = powerManager.isInteractive
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        registerReceiver(screenReceiver, screenFilter)
+        
+        Log.d(TAG, "BlockOverlayService created, screenOn=$isScreenOn")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -166,12 +197,17 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                         WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                         WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD,
+                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL.inv() and 0 or
+                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
                 x = 0
                 y = 0
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
             }
 
             windowManager?.addView(overlayView, params)
@@ -201,7 +237,11 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
             
             while (remainingSeconds > 0 && isCountdownRunning) {
                 delay(1000)
-                remainingSeconds--
+                if (isScreenOn) {
+                    remainingSeconds--
+                } else {
+                    Log.d(TAG, "Countdown paused (screen off), remaining=$remainingSeconds")
+                }
             }
             
             if (isCountdownRunning) {
@@ -229,6 +269,12 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         isCountdownRunning = false
         countdownJob?.cancel()
         countdownJob = null
+        
+        try {
+            unregisterReceiver(screenReceiver)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering screen receiver", e)
+        }
         
         try {
             if (overlayView != null && windowManager != null) {
@@ -304,14 +350,6 @@ private fun BlockOverlayContent(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Text(
-                text = "Rest your eyes and relax",
-                fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

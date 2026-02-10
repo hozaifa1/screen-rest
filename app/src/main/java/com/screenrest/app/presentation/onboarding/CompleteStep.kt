@@ -1,6 +1,7 @@
 package com.screenrest.app.presentation.onboarding
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -24,136 +25,107 @@ fun CompleteStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 28.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
             text = "All Set!",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(
-            text = "Here's your permission summary",
-            style = MaterialTheme.typography.bodyLarge,
+            text = "Permission summary",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Card(
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = when (enforcementLevel) {
-                    EnforcementLevel.FULL -> MaterialTheme.colorScheme.primaryContainer
-                    EnforcementLevel.STANDARD -> MaterialTheme.colorScheme.secondaryContainer
-                    EnforcementLevel.BASIC -> MaterialTheme.colorScheme.tertiaryContainer
-                    EnforcementLevel.NONE -> MaterialTheme.colorScheme.errorContainer
-                }
-            )
+            shape = RoundedCornerShape(12.dp),
+            color = when (enforcementLevel) {
+                EnforcementLevel.FULL -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                EnforcementLevel.STANDARD -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                EnforcementLevel.BASIC -> MaterialTheme.colorScheme.surfaceVariant
+                EnforcementLevel.NONE -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+            }
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Enforcement Level",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                    text = "Enforcement",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = enforcementLevel.name,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = when (enforcementLevel) {
-                        EnforcementLevel.FULL -> "Maximum break enforcement"
-                        EnforcementLevel.STANDARD -> "Good break enforcement"
-                        EnforcementLevel.BASIC -> "Basic break enforcement"
+                        EnforcementLevel.FULL -> "Maximum protection"
+                        EnforcementLevel.STANDARD -> "Good protection"
+                        EnforcementLevel.BASIC -> "Basic protection"
                         EnforcementLevel.NONE -> "Insufficient permissions"
                     },
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            PermissionCheckItem(
-                name = "Usage Stats",
-                isGranted = permissionStatus.usageStats
-            )
-            
-            PermissionCheckItem(
-                name = "Display Over Apps",
-                isGranted = permissionStatus.overlay
-            )
-            
-            PermissionCheckItem(
-                name = "Notifications",
-                isGranted = permissionStatus.notification
-            )
-            
-            PermissionCheckItem(
-                name = "Accessibility Service",
-                isGranted = permissionStatus.accessibility
-            )
+            PermissionCheckItem(name = "Usage Stats", isGranted = permissionStatus.usageStats)
+            PermissionCheckItem(name = "Display Over Apps", isGranted = permissionStatus.overlay)
+            PermissionCheckItem(name = "Notifications", isGranted = permissionStatus.notification)
+            PermissionCheckItem(name = "Accessibility", isGranted = permissionStatus.accessibility)
         }
-        
+
         Spacer(modifier = Modifier.weight(1f))
-        
+
         Button(
             onClick = onComplete,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(12.dp),
             enabled = permissionStatus.usageStats && permissionStatus.overlay
         ) {
-            Text(
-                text = "Start Using ScreenRest",
-                style = MaterialTheme.typography.titleMedium
-            )
+            Text("Start Using ScreenRest", style = MaterialTheme.typography.labelLarge)
         }
-        
+
         if (!permissionStatus.usageStats || !permissionStatus.overlay) {
-            Spacer(modifier = Modifier.height(8.dp))
-            
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Please grant required permissions to continue",
-                style = MaterialTheme.typography.bodySmall,
+                text = "Grant required permissions to continue",
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center
             )
         }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(onClick = onBack) {
+            Text("Back", style = MaterialTheme.typography.labelMedium)
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
+
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
@@ -169,24 +141,16 @@ fun PermissionCheckItem(
         Icon(
             imageVector = if (isGranted) Icons.Default.Check else Icons.Default.Close,
             contentDescription = null,
-            tint = if (isGranted) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(20.dp)
+            tint = if (isGranted) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
         )
-        
-        Spacer(modifier = Modifier.width(12.dp))
-        
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = name,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isGranted) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isGranted) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

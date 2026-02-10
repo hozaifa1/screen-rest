@@ -2,22 +2,32 @@ package com.screenrest.app.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Primary = Color(0xFF6366F1)
-val PrimaryVariant = Color(0xFF4F46E5)
-val Secondary = Color(0xFF8B5CF6)
-val SecondaryVariant = Color(0xFF7C3AED)
+// Primary teal/green accent
+val Primary = Color(0xFF26A69A)
+val PrimaryVariant = Color(0xFF00897B)
+val PrimaryLight = Color(0xFF4DB6AC)
+val Secondary = Color(0xFF80CBC4)
+val SecondaryVariant = Color(0xFF4DB6AC)
 
-val BackgroundLight = Color(0xFFFAFAFA)
-val BackgroundDark = Color(0xFF121212)
+// Dark backgrounds (deep dark with slight green tint)
+val BackgroundLight = Color(0xFFF5F7F6)
+val BackgroundDark = Color(0xFF0D1B1A)
 val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceDark = Color(0xFF1E1E1E)
+val SurfaceDark = Color(0xFF142625)
+val SurfaceVariantDark = Color(0xFF1A302F)
+val CardDark = Color(0xFF1C3331)
 
-val BlockBackground = Color(0xFF1A1A2E)
+// Block screen
+val BlockBackground = Color(0xFF0A1514)
 
-val TextPrimary = Color(0xFF1A1A1A)
-val TextSecondary = Color(0xFF757575)
-val TextOnDark = Color(0xFFFFFFFF)
+// Text
+val TextPrimary = Color(0xFF1A2B2A)
+val TextSecondary = Color(0xFF5F7A78)
+val TextOnDark = Color(0xFFE0F2F1)
+val TextMuted = Color(0xFF80A09E)
 
-val Success = Color(0xFF10B981)
-val Warning = Color(0xFFF59E0B)
-val Error = Color(0xFFEF4444)
+// Semantic
+val Success = Color(0xFF26A69A)
+val Warning = Color(0xFFFFA726)
+val Error = Color(0xFFEF5350)
+val ErrorDark = Color(0xFF4E2528)

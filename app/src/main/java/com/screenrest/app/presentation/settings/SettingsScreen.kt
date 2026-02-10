@@ -1,10 +1,13 @@
 package com.screenrest.app.presentation.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,22 +25,29 @@ fun SettingsScreen(
     onNavigateToCustomMessages: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+
     if (uiState.showLongDurationWarning) {
         LongDurationWarningDialog(
             onDismiss = { viewModel.dismissLongDurationWarning() }
         )
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Text(
+                        "Settings",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -49,348 +59,309 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            BreakConfigurationSection(
+            // Break timing section
+            SectionHeader("Break Timing")
+            BreakTimingCard(
                 breakConfig = uiState.breakConfig,
                 onThresholdSecondsChange = { viewModel.updateThresholdSeconds(it) },
                 onDurationChange = { viewModel.updateDuration(it) }
             )
-            
-            HorizontalDivider()
-            
-            MessagesSection(
+
+            // Messages section
+            SectionHeader("Messages")
+            MessagesCard(
                 quranMessagesEnabled = uiState.breakConfig.quranMessagesEnabled,
                 onQuranMessagesToggle = { viewModel.updateQuranMessagesEnabled(it) },
                 onNavigateToCustomMessages = onNavigateToCustomMessages
             )
-            
-            HorizontalDivider()
-            
-            AppearanceSection(
+
+            // Appearance section
+            SectionHeader("Appearance")
+            ThemeCard(
                 currentTheme = uiState.themeMode,
                 onThemeChange = { viewModel.updateTheme(it) }
             )
-            
-            HorizontalDivider()
-            
-            AboutSection()
+
+            // About
+            SectionHeader("About")
+            AboutCard()
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun BreakConfigurationSection(
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+    )
+}
+
+@Composable
+private fun BreakTimingCard(
     breakConfig: com.screenrest.app.domain.model.BreakConfig,
     onThresholdSecondsChange: (Int) -> Unit,
     onDurationChange: (Int) -> Unit
 ) {
-    var thresholdMinutesText by remember(breakConfig.usageThresholdSeconds) { 
-        mutableStateOf((breakConfig.usageThresholdSeconds / 60).toString()) 
+    var thresholdMinutesText by remember(breakConfig.usageThresholdSeconds) {
+        mutableStateOf((breakConfig.usageThresholdSeconds / 60).toString())
     }
-    var thresholdSecondsText by remember(breakConfig.usageThresholdSeconds) { 
-        mutableStateOf((breakConfig.usageThresholdSeconds % 60).toString()) 
+    var thresholdSecondsText by remember(breakConfig.usageThresholdSeconds) {
+        mutableStateOf((breakConfig.usageThresholdSeconds % 60).toString())
     }
-    var durationMinutesText by remember(breakConfig.blockDurationSeconds) { 
-        mutableStateOf((breakConfig.blockDurationSeconds / 60).toString()) 
+    var durationMinutesText by remember(breakConfig.blockDurationSeconds) {
+        mutableStateOf((breakConfig.blockDurationSeconds / 60).toString())
     }
-    var durationSecondsText by remember(breakConfig.blockDurationSeconds) { 
-        mutableStateOf((breakConfig.blockDurationSeconds % 60).toString()) 
+    var durationSecondsText by remember(breakConfig.blockDurationSeconds) {
+        mutableStateOf((breakConfig.blockDurationSeconds % 60).toString())
     }
-    
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
-        Text(
-            text = "Break Configuration",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Text(
-            text = "Usage Threshold (trigger break after)",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = thresholdMinutesText,
-                onValueChange = { value ->
-                    if (value.all { it.isDigit() } && value.length <= 4) {
-                        thresholdMinutesText = value
-                        val minutes = value.toIntOrNull() ?: 0
-                        val seconds = thresholdSecondsText.toIntOrNull() ?: 0
-                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 86400)
-                        onThresholdSecondsChange(totalSeconds)
-                    }
-                },
-                label = { Text("Min") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Threshold
+            Text(
+                text = "Trigger break after",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
-            OutlinedTextField(
-                value = thresholdSecondsText,
-                onValueChange = { value ->
-                    if (value.all { it.isDigit() } && value.length <= 2) {
-                        thresholdSecondsText = value
-                        val minutes = thresholdMinutesText.toIntOrNull() ?: 0
-                        val seconds = (value.toIntOrNull() ?: 0).coerceIn(0, 59)
-                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 86400)
-                        onThresholdSecondsChange(totalSeconds)
-                    }
-                },
-                label = { Text("Sec") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = thresholdMinutesText,
+                    onValueChange = { value ->
+                        if (value.all { it.isDigit() } && value.length <= 4) {
+                            thresholdMinutesText = value
+                            val minutes = value.toIntOrNull() ?: 0
+                            val seconds = thresholdSecondsText.toIntOrNull() ?: 0
+                            val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 86400)
+                            onThresholdSecondsChange(totalSeconds)
+                        }
+                    },
+                    label = { Text("Min", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedTextField(
+                    value = thresholdSecondsText,
+                    onValueChange = { value ->
+                        if (value.all { it.isDigit() } && value.length <= 2) {
+                            thresholdSecondsText = value
+                            val minutes = thresholdMinutesText.toIntOrNull() ?: 0
+                            val seconds = (value.toIntOrNull() ?: 0).coerceIn(0, 59)
+                            val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 86400)
+                            onThresholdSecondsChange(totalSeconds)
+                        }
+                    },
+                    label = { Text("Sec", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                thickness = 0.5.dp
             )
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Duration
+            Text(
+                text = "Block screen for",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = durationMinutesText,
+                    onValueChange = { value ->
+                        if (value.all { it.isDigit() } && value.length <= 3) {
+                            durationMinutesText = value
+                            val minutes = value.toIntOrNull() ?: 0
+                            val seconds = durationSecondsText.toIntOrNull() ?: 0
+                            val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 7200)
+                            onDurationChange(totalSeconds)
+                        }
+                    },
+                    label = { Text("Min", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedTextField(
+                    value = durationSecondsText,
+                    onValueChange = { value ->
+                        if (value.all { it.isDigit() } && value.length <= 2) {
+                            durationSecondsText = value
+                            val minutes = durationMinutesText.toIntOrNull() ?: 0
+                            val seconds = (value.toIntOrNull() ?: 0).coerceIn(0, 59)
+                            val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 7200)
+                            onDurationChange(totalSeconds)
+                        }
+                    },
+                    label = { Text("Sec", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = "Break Duration (block screen for)",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = durationMinutesText,
-                onValueChange = { value ->
-                    if (value.all { it.isDigit() } && value.length <= 3) {
-                        durationMinutesText = value
-                        val minutes = value.toIntOrNull() ?: 0
-                        val seconds = durationSecondsText.toIntOrNull() ?: 0
-                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 7200)
-                        onDurationChange(totalSeconds)
-                    }
-                },
-                label = { Text("Min") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-            
-            OutlinedTextField(
-                value = durationSecondsText,
-                onValueChange = { value ->
-                    if (value.all { it.isDigit() } && value.length <= 2) {
-                        durationSecondsText = value
-                        val minutes = durationMinutesText.toIntOrNull() ?: 0
-                        val seconds = (value.toIntOrNull() ?: 0).coerceIn(0, 59)
-                        val totalSeconds = (minutes * 60 + seconds).coerceIn(1, 7200)
-                        onDurationChange(totalSeconds)
-                    }
-                },
-                label = { Text("Sec") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-        }
-        
     }
 }
 
 @Composable
-private fun MessagesSection(
+private fun MessagesCard(
     quranMessagesEnabled: Boolean,
     onQuranMessagesToggle: (Boolean) -> Unit,
     onNavigateToCustomMessages: () -> Unit
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
-        Text(
-            text = "Break Messages",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Show Quranic Verses",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = if (quranMessagesEnabled) 
-                                "Quranic verses will be shown during breaks" 
-                            else 
-                                "Only custom messages will be shown",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = quranMessagesEnabled,
-                        onCheckedChange = onQuranMessagesToggle
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Quranic Verses",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = if (quranMessagesEnabled) "Shown during breaks" else "Disabled",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                HorizontalDivider()
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Text(
-                    text = "During breaks, you'll see:",
-                    style = MaterialTheme.typography.bodyMedium
+                Switch(
+                    checked = quranMessagesEnabled,
+                    onCheckedChange = onQuranMessagesToggle
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                thickness = 0.5.dp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToCustomMessages() }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = if (quranMessagesEnabled)
-                        "• Custom messages (if you add any)\n• Quranic verses from API (with fallback)\n• Built-in verses (always available)"
-                    else
-                        "• Custom messages only\n• Add messages below to personalize your breaks",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Custom Messages",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Button(
-                    onClick = onNavigateToCustomMessages,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Manage Custom Messages")
-                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AppearanceSection(
+private fun ThemeCard(
     currentTheme: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
-        Text(
-            text = "Appearance",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ThemeMode.entries.forEach { mode ->
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = currentTheme == mode,
-                        onClick = { onThemeChange(mode) }
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Column(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = mode.name.replace('_', ' ').lowercase()
-                                .replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        
+                val selected = currentTheme == mode
+                FilterChip(
+                    selected = selected,
+                    onClick = { onThemeChange(mode) },
+                    label = {
                         Text(
                             text = when (mode) {
-                                ThemeMode.SYSTEM -> "Follow system settings"
-                                ThemeMode.LIGHT -> "Always use light theme"
-                                ThemeMode.DARK -> "Always use dark theme"
+                                ThemeMode.SYSTEM -> "Auto"
+                                ThemeMode.LIGHT -> "Light"
+                                ThemeMode.DARK -> "Dark"
                             },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.labelMedium
                         )
-                    }
-                }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AboutSection() {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+private fun AboutCard() {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
-        Text(
-            text = "About",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Card(
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AboutItem("Version", "1.0.0")
-                AboutItem("License", "MIT")
-                AboutItem("Source Code", "github.com/screenrest/app")
-            }
+            AboutRow("Version", "1.0.0")
+            AboutRow("License", "MIT")
         }
     }
 }
 
 @Composable
-private fun AboutItem(label: String, value: String) {
+private fun AboutRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium
         )
-    }
-}
-
-private fun formatDuration(seconds: Int): String {
-    return when {
-        seconds < 60 -> "$seconds seconds"
-        seconds % 60 == 0 -> "${seconds / 60} minutes"
-        else -> {
-            val min = seconds / 60
-            val sec = seconds % 60
-            "$min min $sec sec"
-        }
     }
 }

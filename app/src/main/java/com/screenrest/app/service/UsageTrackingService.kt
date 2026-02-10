@@ -189,7 +189,7 @@ class UsageTrackingService : LifecycleService() {
         
         val thresholdReached = currentUsageMs >= thresholdMs
         
-        if (thresholdReached && !hasTriggeredBlockThisCycle && !BlockAccessibilityService.isBlockActive && !BlockOverlayService.isOverlayActive) {
+        if (thresholdReached && !hasTriggeredBlockThisCycle && !BlockAccessibilityService.isBlockActive && !BlockOverlayService.isOverlayActive && isScreenOn) {
             Log.w(TAG, "THRESHOLD REACHED! Usage=${currentUsageMs}ms >= ${thresholdMs}ms")
             hasTriggeredBlockThisCycle = true
             

@@ -1,7 +1,7 @@
 package com.screenrest.app.presentation.onboarding
 
-import android.content.Context
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
@@ -23,99 +23,79 @@ fun UsageAccessStep(
     onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 28.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
             text = "Usage Access",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(
             text = "Required to track your screen time",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         PermissionStatusCard(
             isGranted = isGranted,
             title = "Usage Stats Permission",
             description = if (isGranted) {
-                "Permission granted successfully"
+                "Permission granted"
             } else {
-                "This permission allows ScreenRest to monitor your screen usage time. Your data stays private and never leaves your device."
+                "Allows ScreenRest to monitor screen usage. Data stays on-device."
             }
         )
-        
+
         Spacer(modifier = Modifier.weight(1f))
-        
+
         if (!isGranted) {
             Button(
-                onClick = {
-                    context.openUsageAccessSettings()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                onClick = { context.openUsageAccessSettings() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = "Grant Permission",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Grant Permission", style = MaterialTheme.typography.labelLarge)
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedButton(
-                onClick = {
-                    onRefresh()
-                    if (isGranted) onNext()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                onClick = { onRefresh(); if (isGranted) onNext() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = "I've Granted It, Continue",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("I've Granted It", style = MaterialTheme.typography.labelLarge)
             }
         } else {
             Button(
                 onClick = onNext,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = "Continue",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Continue", style = MaterialTheme.typography.labelLarge)
             }
         }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(onClick = onBack) {
+            Text("Back", style = MaterialTheme.typography.labelMedium)
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
+
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
@@ -125,57 +105,43 @@ fun PermissionStatusCard(
     title: String,
     description: String
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isGranted) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.errorContainer
-            }
-        )
+        shape = RoundedCornerShape(12.dp),
+        color = if (isGranted) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+        } else {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+        }
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.Top
         ) {
             Icon(
                 imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Warning,
                 contentDescription = null,
-                tint = if (isGranted) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onErrorContainer
-                },
-                modifier = Modifier.size(24.dp)
+                tint = if (isGranted) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
             )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             Column {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isGranted) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    }
+                    color = if (isGranted) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onErrorContainer
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isGranted) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    }
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isGranted) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onErrorContainer
                 )
             }
         }

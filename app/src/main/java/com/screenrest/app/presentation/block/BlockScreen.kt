@@ -76,15 +76,6 @@ fun BlockScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(48.dp))
-            
-            Text(
-                text = "Take a moment to rest.",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 16.sp
-                ),
-                color = Color.White.copy(alpha = 0.7f)
-            )
         }
     }
 }

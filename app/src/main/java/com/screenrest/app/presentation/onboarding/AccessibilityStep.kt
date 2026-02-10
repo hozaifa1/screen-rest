@@ -1,6 +1,7 @@
 package com.screenrest.app.presentation.onboarding
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,128 +20,94 @@ fun AccessibilityStep(
     onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 28.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = "Enhanced Enforcement",
-            style = MaterialTheme.typography.headlineMedium,
+            text = "Enhanced Protection",
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(
-            text = "Optional - For stronger break enforcement",
-            style = MaterialTheme.typography.bodyLarge,
+            text = "Optional — for stronger break enforcement",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Card(
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = "⚠️ Important",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "Without accessibility service, you can exit break screens using the home button. With it enabled, breaks are enforced more strictly.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
+            Text(
+                text = "Without this, the break screen can be bypassed via the notification bar or home button. With it enabled, breaks are fully enforced.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(14.dp),
+                lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+            )
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         PermissionStatusCard(
             isGranted = isGranted,
             title = "Accessibility Service",
             description = if (isGranted) {
-                "Service enabled successfully"
+                "Service enabled"
             } else {
-                "Prevents bypassing break screens. This is completely optional - the app works fine without it."
+                "Prevents bypassing break screens. Completely optional."
             }
         )
-        
+
         Spacer(modifier = Modifier.weight(1f))
-        
+
         if (!isGranted) {
             Button(
-                onClick = {
-                    context.openAccessibilitySettings()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                onClick = { context.openAccessibilitySettings() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = "Enable Service",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Enable Service", style = MaterialTheme.typography.labelLarge)
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedButton(
-                onClick = {
-                    onRefresh()
-                    if (isGranted) onNext() else onNext()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                onClick = { onRefresh(); onNext() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = "Skip for Now",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Skip for Now", style = MaterialTheme.typography.labelLarge)
             }
         } else {
             Button(
                 onClick = onNext,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = "Continue",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Continue", style = MaterialTheme.typography.labelLarge)
             }
         }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(onClick = onBack) {
+            Text("Back", style = MaterialTheme.typography.labelMedium)
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
+
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
