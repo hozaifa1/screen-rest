@@ -184,35 +184,64 @@ class BlockActivity : ComponentActivity() {
 
 @Composable
 private fun SimpleBlockScreen(remainingSeconds: Int) {
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val palette = com.screenrest.app.presentation.theme.LocalThemeColorPalette.current
     val minutes = remainingSeconds / 60
     val seconds = remainingSeconds % 60
+
+    val gradientTop = if (isDark) palette.gradientTopDark else palette.gradientTopLight
+    val gradientBottom = if (isDark) palette.gradientBottomDark else palette.gradientBottomLight
+    val timerColor = if (isDark) palette.primaryLight else palette.primaryVariant
+    val messageColor = if (isDark) palette.textOnDark else palette.textPrimary
+    val subtitleColor = if (isDark) palette.textMuted else palette.textSecondary
     
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A2E)),
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(gradientTop, gradientBottom)
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(24.dp)
         ) {
-            Text(
-                text = String.format("%d:%02d", minutes, seconds),
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            androidx.compose.material3.Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                color = timerColor.copy(alpha = 0.15f)
+            ) {
+                Text(
+                    text = String.format("%d:%02d", minutes, seconds),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = timerColor,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+            }
             
-            Spacer(modifier = Modifier.height(32.dp))
-            
+            Spacer(modifier = Modifier.height(12.dp))
+
             Text(
                 text = "Take a break",
-                fontSize = 24.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.9f)
+                color = subtitleColor
             )
+
+            Spacer(modifier = Modifier.height(40.dp))
             
+            Text(
+                text = "Take a moment to rest your eyes and reflect.",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Normal,
+                color = messageColor,
+                textAlign = TextAlign.Center,
+                lineHeight = 34.sp,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
     }
 }

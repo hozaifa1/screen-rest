@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.screenrest.app.domain.model.BreakConfig
+import com.screenrest.app.domain.model.ThemeColor
 import com.screenrest.app.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -33,9 +34,11 @@ class SettingsDataStore @Inject constructor(
         val LOCATION_LNG = doublePreferencesKey("location_lng")
         val LOCATION_RADIUS_METERS = floatPreferencesKey("location_radius_meters")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val THEME_COLOR = stringPreferencesKey("theme_color")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val USAGE_TRACKING_ENABLED = booleanPreferencesKey("usage_tracking_enabled")
         val QURAN_MESSAGES_ENABLED = booleanPreferencesKey("quran_messages_enabled")
+        val ISLAMIC_REMINDERS_ENABLED = booleanPreferencesKey("islamic_reminders_enabled")
         val LAST_BREAK_TIMESTAMP = longPreferencesKey("last_break_timestamp")
     }
 
@@ -47,7 +50,8 @@ class SettingsDataStore @Inject constructor(
             locationLat = preferences[PreferencesKeys.LOCATION_LAT],
             locationLng = preferences[PreferencesKeys.LOCATION_LNG],
             locationRadiusMeters = preferences[PreferencesKeys.LOCATION_RADIUS_METERS] ?: 100f,
-            quranMessagesEnabled = preferences[PreferencesKeys.QURAN_MESSAGES_ENABLED] ?: true
+            quranMessagesEnabled = preferences[PreferencesKeys.QURAN_MESSAGES_ENABLED] ?: true,
+            islamicRemindersEnabled = preferences[PreferencesKeys.ISLAMIC_REMINDERS_ENABLED] ?: true
         )
     }
 
@@ -57,6 +61,10 @@ class SettingsDataStore @Inject constructor(
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
         ThemeMode.valueOf(preferences[PreferencesKeys.THEME_MODE] ?: ThemeMode.SYSTEM.name)
+    }
+
+    val themeColor: Flow<ThemeColor> = context.dataStore.data.map { preferences ->
+        ThemeColor.valueOf(preferences[PreferencesKeys.THEME_COLOR] ?: ThemeColor.TEAL.name)
     }
 
     val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -76,6 +84,7 @@ class SettingsDataStore @Inject constructor(
             config.locationLng?.let { preferences[PreferencesKeys.LOCATION_LNG] = it }
             preferences[PreferencesKeys.LOCATION_RADIUS_METERS] = config.locationRadiusMeters
             preferences[PreferencesKeys.QURAN_MESSAGES_ENABLED] = config.quranMessagesEnabled
+            preferences[PreferencesKeys.ISLAMIC_REMINDERS_ENABLED] = config.islamicRemindersEnabled
         }
     }
 
@@ -88,6 +97,12 @@ class SettingsDataStore @Inject constructor(
     suspend fun updateThemeMode(theme: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_MODE] = theme.name
+        }
+    }
+
+    suspend fun updateThemeColor(color: ThemeColor) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.THEME_COLOR] = color.name
         }
     }
 

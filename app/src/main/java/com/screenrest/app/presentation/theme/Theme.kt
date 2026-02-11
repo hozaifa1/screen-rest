@@ -5,54 +5,60 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.screenrest.app.domain.model.ThemeColor
 import com.screenrest.app.domain.model.ThemeMode
 
-private val LightColorScheme = lightColorScheme(
-    primary = Primary,
+val LocalThemeColorPalette = staticCompositionLocalOf { getThemeColorPalette(ThemeColor.TEAL) }
+
+private fun buildLightColorScheme(p: ThemeColorPalette) = lightColorScheme(
+    primary = p.primary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD0F0ED),
-    onPrimaryContainer = PrimaryVariant,
-    secondary = Secondary,
+    primaryContainer = p.primaryContainerLight,
+    onPrimaryContainer = p.primaryVariant,
+    secondary = p.secondary,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE0F5F3),
-    onSecondaryContainer = PrimaryVariant,
-    background = BackgroundLight,
-    onBackground = TextPrimary,
-    surface = SurfaceLight,
-    onSurface = TextPrimary,
-    surfaceVariant = Color(0xFFEEF3F2),
-    onSurfaceVariant = TextSecondary,
+    secondaryContainer = p.secondaryContainerLight,
+    onSecondaryContainer = p.primaryVariant,
+    background = p.backgroundLight,
+    onBackground = p.textPrimary,
+    surface = p.surfaceLight,
+    onSurface = p.textPrimary,
+    surfaceVariant = p.surfaceVariantLight,
+    onSurfaceVariant = p.textSecondary,
     error = Error,
     errorContainer = Color(0xFFFFEBEE),
     onErrorContainer = Error,
-    outline = Color(0xFFBCC8C7)
+    outline = p.outlineLight
 )
 
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryLight,
-    onPrimary = Color(0xFF003733),
-    primaryContainer = CardDark,
-    onPrimaryContainer = TextOnDark,
-    secondary = Secondary,
-    onSecondary = Color(0xFF003733),
-    secondaryContainer = SurfaceVariantDark,
-    onSecondaryContainer = TextOnDark,
-    background = BackgroundDark,
-    onBackground = TextOnDark,
-    surface = SurfaceDark,
-    onSurface = TextOnDark,
-    surfaceVariant = SurfaceVariantDark,
-    onSurfaceVariant = TextMuted,
+private fun buildDarkColorScheme(p: ThemeColorPalette) = darkColorScheme(
+    primary = p.primaryLight,
+    onPrimary = p.primaryVariant,
+    primaryContainer = p.cardDark,
+    onPrimaryContainer = p.textOnDark,
+    secondary = p.secondary,
+    onSecondary = p.primaryVariant,
+    secondaryContainer = p.surfaceVariantDark,
+    onSecondaryContainer = p.textOnDark,
+    background = p.backgroundDark,
+    onBackground = p.textOnDark,
+    surface = p.surfaceDark,
+    onSurface = p.textOnDark,
+    surfaceVariant = p.surfaceVariantDark,
+    onSurfaceVariant = p.textMuted,
     error = Error,
     errorContainer = ErrorDark,
     onErrorContainer = Color(0xFFFFB4AB),
-    outline = Color(0xFF3D5554)
+    outline = p.outlineDark
 )
 
 @Composable
 fun ScreenRestTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    themeColor: ThemeColor = ThemeColor.TEAL,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -60,12 +66,15 @@ fun ScreenRestTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
-    
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+
+    val palette = getThemeColorPalette(themeColor)
+    val colorScheme = if (darkTheme) buildDarkColorScheme(palette) else buildLightColorScheme(palette)
+
+    CompositionLocalProvider(LocalThemeColorPalette provides palette) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

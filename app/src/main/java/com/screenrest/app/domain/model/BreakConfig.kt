@@ -7,5 +7,6 @@ data class BreakConfig(
     val locationLat: Double? = null,
     val locationLng: Double? = null,
     val locationRadiusMeters: Float = 100f,
-    val quranMessagesEnabled: Boolean = true
+    val quranMessagesEnabled: Boolean = true,
+    val islamicRemindersEnabled: Boolean = true
 )

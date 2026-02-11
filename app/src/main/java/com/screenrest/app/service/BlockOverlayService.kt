@@ -13,13 +13,21 @@ import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,11 +44,16 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.screenrest.app.data.repository.SettingsRepository
 import com.screenrest.app.domain.model.DisplayMessage
+import com.screenrest.app.domain.model.ThemeColor
+import com.screenrest.app.domain.model.ThemeMode
 import com.screenrest.app.domain.usecase.GetRandomDisplayMessageUseCase
 import com.screenrest.app.presentation.theme.ScreenRestTheme
+import com.screenrest.app.presentation.theme.getThemeColorPalette
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -57,6 +70,9 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     @Inject
     lateinit var getRandomDisplayMessageUseCase: GetRandomDisplayMessageUseCase
+    
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
 
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
@@ -66,8 +82,9 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     
     private var countdownJob: Job? = null
     private var remainingSeconds by mutableIntStateOf(30)
-    private var displayMessage by mutableStateOf("Take a break")
-    private var displayMessageArabic by mutableStateOf("")
+    private var currentDisplayMessage by mutableStateOf<DisplayMessage?>(null)
+    private var currentThemeMode by mutableStateOf(ThemeMode.SYSTEM)
+    private var currentThemeColor by mutableStateOf(ThemeColor.TEAL)
     
     private var isInitialized = false
     private var isCountdownRunning = false
@@ -124,24 +141,15 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         isOverlayActive = true
         remainingSeconds = duration
         
-        // Load message BEFORE showing overlay to prevent rotation
+        // Load message and theme BEFORE showing overlay to prevent rotation
         lifecycleScope.launch {
             try {
-                val message = getRandomDisplayMessageUseCase()
-                when (message) {
-                    is DisplayMessage.Custom -> {
-                        displayMessage = message.text
-                        displayMessageArabic = ""
-                    }
-                    is DisplayMessage.QuranAyah -> {
-                        displayMessage = message.ayah.englishTranslation
-                        displayMessageArabic = message.ayah.arabicText
-                    }
-                }
+                currentThemeMode = settingsRepository.themeMode.first()
+                currentThemeColor = settingsRepository.themeColor.first()
+                currentDisplayMessage = getRandomDisplayMessageUseCase()
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading message", e)
-                displayMessage = "Take a moment to rest your eyes and reflect."
-                displayMessageArabic = ""
+                currentDisplayMessage = DisplayMessage.Custom("Take a moment to rest your eyes and reflect.")
             }
             
             // Now show overlay with loaded message
@@ -172,11 +180,16 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                 setViewTreeSavedStateRegistryOwner(this@BlockOverlayService)
                 
                 setContent {
-                    ScreenRestTheme {
+                    ScreenRestTheme(themeMode = currentThemeMode, themeColor = currentThemeColor) {
                         BlockOverlayContent(
                             remainingSeconds = remainingSeconds,
-                            displayMessage = displayMessage,
-                            displayMessageArabic = displayMessageArabic
+                            displayMessage = currentDisplayMessage,
+                            isDarkTheme = when (currentThemeMode) {
+                                ThemeMode.DARK -> true
+                                ThemeMode.LIGHT -> false
+                                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                            },
+                            themeColor = currentThemeColor
                         )
                     }
                 }
@@ -197,9 +210,7 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                         WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                         WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL.inv() and 0 or
-                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
@@ -296,60 +307,129 @@ class BlockOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 @Composable
 private fun BlockOverlayContent(
     remainingSeconds: Int,
-    displayMessage: String,
-    displayMessageArabic: String
+    displayMessage: DisplayMessage?,
+    isDarkTheme: Boolean,
+    themeColor: ThemeColor = ThemeColor.TEAL
 ) {
     val minutes = remainingSeconds / 60
     val seconds = remainingSeconds % 60
-    
+
+    // Theme-aware colors from palette
+    val palette = getThemeColorPalette(themeColor)
+    val gradientTop = if (isDarkTheme) palette.gradientTopDark else palette.gradientTopLight
+    val gradientBottom = if (isDarkTheme) palette.gradientBottomDark else palette.gradientBottomLight
+    val timerColor = if (isDarkTheme) palette.primaryLight else palette.primaryVariant
+    val messageColor = if (isDarkTheme) palette.textOnDark else palette.textPrimary
+    val referenceColor = if (isDarkTheme) palette.secondary else palette.primary
+    val dividerColor = if (isDarkTheme) palette.dividerDark else palette.dividerLight
+    val subtitleColor = if (isDarkTheme) palette.textMuted else palette.textSecondary
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A2E)),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(gradientTop, gradientBottom)
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .padding(24.dp)
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp, vertical = 48.dp)
         ) {
-            // Timer countdown
-            Text(
-                text = String.format("%d:%02d", minutes, seconds),
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            
-            Spacer(modifier = Modifier.height(48.dp))
-            
-            // Arabic text if available (Quran verse)
-            if (displayMessageArabic.isNotEmpty()) {
+            // Timer countdown - small and subtle at top
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = timerColor.copy(alpha = 0.15f)
+            ) {
                 Text(
-                    text = displayMessageArabic,
+                    text = String.format("%d:%02d", minutes, seconds),
                     fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF4CAF50),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 48.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    fontWeight = FontWeight.SemiBold,
+                    color = timerColor,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 )
-                
-                Spacer(modifier = Modifier.height(24.dp))
             }
-            
-            // Translation or custom message
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             Text(
-                text = displayMessage,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.9f),
-                textAlign = TextAlign.Center,
-                lineHeight = 32.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                text = "Take a break",
+                fontSize = 14.sp,
+                color = subtitleColor,
+                fontWeight = FontWeight.Medium
             )
-            
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(0.3f),
+                color = dividerColor,
+                thickness = 1.dp
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Message content - large and prominent
+            when (displayMessage) {
+                is DisplayMessage.QuranAyah -> {
+                    Text(
+                        text = displayMessage.ayah.englishTranslation,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = messageColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 34.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = "\u2014 Surah ${displayMessage.ayah.surahName} (${displayMessage.ayah.surahNumber}:${displayMessage.ayah.ayahNumber})",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontStyle = FontStyle.Italic,
+                        color = referenceColor
+                    )
+                }
+                is DisplayMessage.IslamicReminder -> {
+                    Text(
+                        text = displayMessage.text,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = messageColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 34.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+                is DisplayMessage.Custom -> {
+                    Text(
+                        text = displayMessage.text,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = messageColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 34.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+                null -> {
+                    Text(
+                        text = "Take a moment to rest your eyes and reflect.",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = messageColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 34.sp
+                    )
+                }
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.screenrest.app.data.repository.SettingsRepository
 import com.screenrest.app.domain.model.BreakConfig
+import com.screenrest.app.domain.model.ThemeColor
 import com.screenrest.app.domain.model.ThemeMode
 import com.screenrest.app.domain.usecase.UpdateBreakConfigUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,31 +32,32 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 settingsRepository.breakConfig,
-                settingsRepository.themeMode
-            ) { config, theme ->
-                config to theme
-            }.collect { (config, theme) ->
+                settingsRepository.themeMode,
+                settingsRepository.themeColor
+            ) { config, theme, color ->
+                Triple(config, theme, color)
+            }.collect { (config, theme, color) ->
                 _uiState.value = _uiState.value.copy(
                     breakConfig = config,
-                    themeMode = theme
+                    themeMode = theme,
+                    themeColor = color
                 )
             }
         }
     }
     
-    fun updateThresholdSeconds(seconds: Int) {
+    fun updateTimers(thresholdSeconds: Int, durationSeconds: Int) {
         viewModelScope.launch {
-            val config = _uiState.value.breakConfig.copy(usageThresholdSeconds = seconds)
-            updateBreakConfigUseCase(config)
-        }
-    }
-    
-    fun updateDuration(seconds: Int) {
-        viewModelScope.launch {
-            val config = _uiState.value.breakConfig.copy(blockDurationSeconds = seconds)
+            val config = _uiState.value.breakConfig.copy(
+                usageThresholdSeconds = thresholdSeconds,
+                blockDurationSeconds = durationSeconds
+            )
             
-            if (seconds > 120) {
+            if (durationSeconds > 120) {
                 _uiState.value = _uiState.value.copy(showLongDurationWarning = true)
+            }
+            if (thresholdSeconds < 30) {
+                _uiState.value = _uiState.value.copy(showShortThresholdWarning = true)
             }
             
             updateBreakConfigUseCase(config)
@@ -68,6 +70,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
     
+    fun updateThemeColor(color: ThemeColor) {
+        viewModelScope.launch {
+            settingsRepository.updateThemeColor(color)
+        }
+    }
+    
     fun updateQuranMessagesEnabled(enabled: Boolean) {
         viewModelScope.launch {
             val config = _uiState.value.breakConfig.copy(quranMessagesEnabled = enabled)
@@ -75,13 +83,26 @@ class SettingsViewModel @Inject constructor(
         }
     }
     
+    fun updateIslamicRemindersEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val config = _uiState.value.breakConfig.copy(islamicRemindersEnabled = enabled)
+            updateBreakConfigUseCase(config)
+        }
+    }
+    
     fun dismissLongDurationWarning() {
         _uiState.value = _uiState.value.copy(showLongDurationWarning = false)
+    }
+    
+    fun dismissShortThresholdWarning() {
+        _uiState.value = _uiState.value.copy(showShortThresholdWarning = false)
     }
 }
 
 data class SettingsUiState(
     val breakConfig: BreakConfig = BreakConfig(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val showLongDurationWarning: Boolean = false
+    val themeColor: ThemeColor = ThemeColor.TEAL,
+    val showLongDurationWarning: Boolean = false,
+    val showShortThresholdWarning: Boolean = false
 )
