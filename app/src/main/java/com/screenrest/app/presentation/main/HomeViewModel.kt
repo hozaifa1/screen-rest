@@ -116,6 +116,14 @@ class HomeViewModel @Inject constructor(
                 ServiceController.stopTracking(context)
             }
             
+            // Optimistically update UI immediately so button responds on first tap
+            _uiState.value = _uiState.value.copy(
+                isServiceEnabled = newState,
+                isServiceRunning = newState
+            )
+            
+            // Then confirm actual state after service has had time to start/stop
+            delay(500L)
             refreshStatus()
         }
     }

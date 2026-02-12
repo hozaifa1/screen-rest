@@ -23,29 +23,22 @@ class AyahRepositoryImpl @Inject constructor(
     
     override suspend fun getRandomAyah(): Result<Ayah> = withContext(Dispatchers.IO) {
         try {
-            val maxAttempts = 3
-            for (attempt in 1..maxAttempts) {
-                val randomSurah = Random.nextInt(1, 115)
-                val maxAyahs = getMaxAyahsForSurah(randomSurah)
-                val randomAyah = Random.nextInt(1, maxAyahs + 1)
-                val reference = "$randomSurah:$randomAyah"
-                
-                val arabicResponse = quranApiService.getAyahArabic(reference)
-                val englishResponse = quranApiService.getAyahEnglish(reference)
-                
-                if (englishResponse.data.text.length <= 150) {
-                    val ayah = Ayah(
-                        surahNumber = arabicResponse.data.surah.number,
-                        ayahNumber = arabicResponse.data.numberInSurah,
-                        arabicText = arabicResponse.data.text,
-                        englishTranslation = englishResponse.data.text,
-                        surahName = arabicResponse.data.surah.englishName
-                    )
-                    return@withContext Result.success(ayah)
-                }
-            }
-            val localAyah = localAyahProvider.getRandomLocalAyah()
-            Result.success(localAyah)
+            val randomSurah = Random.nextInt(1, 115)
+            val maxAyahs = getMaxAyahsForSurah(randomSurah)
+            val randomAyah = Random.nextInt(1, maxAyahs + 1)
+            val reference = "$randomSurah:$randomAyah"
+            
+            val arabicResponse = quranApiService.getAyahArabic(reference)
+            val englishResponse = quranApiService.getAyahEnglish(reference)
+            
+            val ayah = Ayah(
+                surahNumber = arabicResponse.data.surah.number,
+                ayahNumber = arabicResponse.data.numberInSurah,
+                arabicText = arabicResponse.data.text,
+                englishTranslation = englishResponse.data.text,
+                surahName = arabicResponse.data.surah.englishName
+            )
+            Result.success(ayah)
         } catch (e: Exception) {
             try {
                 val localAyah = localAyahProvider.getRandomLocalAyah()

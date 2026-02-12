@@ -58,7 +58,7 @@ fun PermissionWarningCard(
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                FilledTonalButton(
+                Button(
                     onClick = {
                         when (permissionType) {
                             "usageStats" -> context.openUsageAccessSettings()
@@ -67,11 +67,15 @@ fun PermissionWarningCard(
                             "notification" -> context.openNotificationSettings()
                         }
                     },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(28.dp)
+                    modifier = Modifier.height(38.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
                 ) {
-                    Text("Fix Now", style = MaterialTheme.typography.labelSmall)
+                    Text("Grant Permission", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
             }
         }
